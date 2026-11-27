@@ -1,0 +1,124 @@
+/**
+ * 全站布局和品牌配色。组件交互由 PrimeVue 负责，业务布局在这里统一维护。
+ * @author pangzhihao
+ */
+:root {
+  color-scheme: light;
+  --ink: #192840;
+  --navy: #102341;
+  --blue: #224a94;
+  --muted: #54657a;
+  --line: #dce5f0;
+  --background: #f4f7fb;
+  --white: #fff;
+  font: 15px/1.55 "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--background);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body { min-width: 320px; margin: 0; }
+a { color: var(--blue); text-decoration: none; }
+button, input { font: inherit; }
+h1, p { margin: 0; }
+h1 { font-size: clamp(25px, 4vw, 36px); line-height: 1.25; }
+:focus-visible { outline: 2px solid #2b61c2; outline-offset: 3px; }
+
+.public-width { width: min(1150px, calc(100% - 40px)); margin-inline: auto; }
+.main-header { background: var(--white); border-bottom: 1px solid var(--line); }
+.header-inner { min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 10px; }
+.brand, .header-links { display: flex; gap: 12px; align-items: center; }
+.brand { color: var(--navy); font-weight: 750; white-space: nowrap; }
+.brand-mark {
+  width: 33px; height: 33px; border-radius: 8px; display: grid; place-items: center;
+  background: var(--navy); color: var(--white); font-weight: 800;
+}
+.header-links { flex-wrap: wrap; justify-content: flex-end; }
+.nav-text { color: var(--ink); }
+.nav-text:hover, .nav-text.router-link-exact-active { color: var(--blue); }
+.solid-link {
+  display: inline-flex; align-items: center; justify-content: center; padding: 8px 15px;
+  border: 1px solid transparent; border-radius: 7px; background: var(--blue); color: #fff;
+  font-weight: 650; width: fit-content;
+}
+.solid-link:hover { background: #183773; }
+.global-notice { margin-top: 12px; padding: 8px 12px; border-radius: 6px; background: #fcecec; color: #8e2531; }
+
+.home-content { padding-block: 30px 55px; }
+.home-hero {
+  min-height: 365px; position: relative; display: flex; align-items: center; isolation: isolate;
+  overflow: hidden; border-radius: 13px; background: var(--navy); color: var(--white);
+}
+.home-hero::after {
+  content: ""; inset: 0; position: absolute; z-index: -1;
+  background: linear-gradient(90deg, #071428f0, #07142882 58%, transparent);
+}
+.hero-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 70% 58%; z-index: -2; }
+.home-hero-copy { display: grid; gap: 14px; padding: clamp(22px, 6vw, 64px); }
+.home-hero h1 { max-width: 16em; font-size: clamp(30px, 5vw, 52px); }
+.home-hero p { color: #d7e5f9; }
+.home-hero .solid-link { margin-top: 4px; background: #f0f5ff; color: var(--navy); }
+
+.auth-main { padding-block: 30px; }
+.auth-shell {
+  max-width: 920px; margin-inline: auto; display: grid; grid-template-columns: 1fr 1fr;
+  background: var(--white); border: 1px solid var(--line); border-radius: 13px; overflow: hidden;
+}
+.auth-image { min-width: 0; position: relative; background: var(--navy); min-height: 440px; }
+.auth-image img { display: block; position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 72% center; }
+.auth-content { padding: clamp(19px, 5vw, 43px); display: grid; align-content: center; gap: 15px; min-width: 0; }
+.auth-heading { display: grid; gap: 8px; color: var(--muted); }
+.auth-heading h1 { color: var(--ink); }
+.auth-form { display: grid; gap: 7px; }
+.auth-form label { margin-top: 6px; font-weight: 650; }
+.auth-form small, .auth-switch { color: var(--muted); }
+.auth-switch a { margin-inline-start: 5px; font-weight: 700; }
+.form-submit { margin-top: 9px; width: 100%; }
+
+.account-page { padding-block: 28px; }
+.account-panel { width: min(100%, 650px); border: 1px solid var(--line); border-radius: 12px; background: var(--white); padding: clamp(18px, 5vw, 34px); }
+.profile-details { display: grid; gap: 15px; margin-block: 22px; }
+.profile-details div { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.profile-details dt { color: var(--muted); }
+.profile-details dd { margin: 0; overflow-wrap: anywhere; }
+.role-list, .table-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+.admin-container { padding-block: 25px; }
+.admin-shell {
+  display: grid; grid-template-columns: 177px minmax(0, 1fr); min-height: 470px;
+  border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--white);
+}
+.admin-sidebar { padding: 20px 13px; background: var(--navy); color: #fff; }
+.admin-brand { display: inline-block; padding-left: 8px; font-size: 18px; font-weight: 750; }
+.admin-sidebar nav { display: grid; gap: 5px; margin-top: 20px; }
+.admin-sidebar a { display: block; padding: 8px; color: #deebfa; border-radius: 7px; }
+.admin-sidebar a:hover, .admin-sidebar a.router-link-exact-active { background: #28486f; color: #fff; }
+.admin-content { min-width: 0; padding: clamp(15px, 3vw, 27px); }
+.page-heading { margin-bottom: 17px; }
+.page-heading p, .table-total, .dialog-text { color: var(--muted); }
+.page-heading p { margin-top: 5px; }
+.table-total { margin-top: 11px; font-size: 13px; }
+.table-actions { white-space: nowrap; }
+.dialog-account { margin-bottom: 9px; font-weight: 650; }
+.dialog-text { margin-bottom: 10px; }
+.role-options { margin: 0 0 10px; border: 0; padding: 0; display: grid; gap: 9px; }
+.role-options label { display: flex; align-items: center; gap: 7px; }
+.role-options legend { color: var(--muted); padding: 0 0 8px; }
+.text-button { color: var(--blue); border: none; background: transparent; text-decoration: underline; cursor: pointer; }
+
+@media (max-width: 700px) {
+  .public-width { width: calc(100% - 26px); }
+  .auth-shell, .admin-shell { grid-template-columns: 1fr; }
+  .auth-image { min-height: 145px; }
+  .auth-image img { object-position: 75% 58%; }
+  .admin-sidebar { padding: 12px; }
+  .admin-sidebar nav { margin-top: 7px; display: flex; gap: 5px; flex-wrap: wrap; }
+  .home-hero { min-height: 300px; }
+}
+
+@media (max-width: 430px) {
+  .header-inner { flex-wrap: wrap; }
+  .header-links { justify-content: flex-start; gap: 10px; }
+  .home-content, .auth-main { padding-top: 16px; }
+  .home-hero::after { background: linear-gradient(90deg, #071428e8, #07142850); }
+}

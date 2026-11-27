@@ -1,0 +1,53 @@
+/**
+ * 使用浏览器请求接口的替身验证会话请求的关键约定。
+ * @author pangzhihao
+ */
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { ApiError, createHttpClient } from '../src/api/http.js'
+
+const json = (body, status = 200) => new Response(JSON.stringify(body), {
+  status,
+  headers: { 'Content-Type': 'application/json' },
+})
+
+test('writes include a CSRF token while reads use only same-origin cookies', async () => {
+  const calls = []
+  const client = createHttpClient(async (url, options) => {
+    calls.push({ url, options })
+    if (url.endsWith('/csrf')) return json({ headerName: 'X-CSRF-TOKEN', token: 'first' })
+    return json({ username: 'member' })
+  })
+  await client.request('/auth/me')
+  await client.request('/auth/register', { method: 'POST', body: { username: 'member' } })
+  assert.deepEqual(calls.map(({ url }) => url), ['/api/auth/me', '/api/auth/csrf', '/api/auth/register'])
+  assert.equal(calls[0].options.credentials, 'same-origin')
+  assert.equal(calls[0].options.headers.get('X-CSRF-TOKEN'), null)
+  assert.equal(calls[2].options.headers.get('X-CSRF-TOKEN'), 'first')
+  assert.equal(calls[2].options.body, '{"username":"member"}')
+})
+
+test('a stale CSRF token is refreshed once before repeating a rejected write', async () => {
+  let tokens = 0
+  const writes = []
+  const client = createHttpClient(async (url, { headers }) => {
+    if (url.endsWith('/csrf')) return json({ headerName: 'X-CSRF-TOKEN', token: String(++tokens) })
+    writes.push(headers.get('X-CSRF-TOKEN'))
+    if (writes.length === 1) return json({ code: 'CSRF_INVALID' }, 403)
+    return new Response(null, { status: 204 })
+  })
+  await client.request('/auth/logout', { method: 'POST' })
+  assert.deepEqual(writes, ['1', '2'])
+})
+
+test('a business permission denial is reported without repeating the action', async () => {
+  let writes = 0
+  const client = createHttpClient(async (url) => {
+    if (url.endsWith('/csrf')) return json({ headerName: 'X-CSRF-TOKEN', token: 'first' })
+    writes += 1
+    return json({ code: 'FORBIDDEN', message: '权限不足' }, 403)
+  })
+  await assert.rejects(client.request('/admin/users/1/active', { method: 'PUT' }),
+    (error) => error instanceof ApiError && error.status === 403 && error.message === '权限不足')
+  assert.equal(writes, 1)
+})

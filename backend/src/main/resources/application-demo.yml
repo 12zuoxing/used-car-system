@@ -1,7 +1,14 @@
+# 作者：pangzhihao
 spring:
   datasource:
     url: ${DEMO_DB_URL:jdbc:h2:file:./data/used-car;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH}
     username: sa
     password: ""
+springdoc:
+  # 本地演示默认开放接口文档，部署配置通过 APP_API_DOCS_ENABLED 显式开启。
+  api-docs:
+    enabled: ${APP_API_DOCS_ENABLED:true}
+  swagger-ui:
+    enabled: ${APP_API_DOCS_ENABLED:true}
 app:
   demo: true

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 作者：pangzhihao。涉及角色和会话撤销状态的 SQL 在此统一维护。 -->
+<mapper namespace="cn.edu.usedcar.mapper.AccountMapper">
+    <resultMap id="identityRow" type="cn.edu.usedcar.mapper.AccountMapper$AccountRoleRow">
+        <constructor>
+            <arg column="id" javaType="_long"/>
+            <arg column="username" javaType="string"/>
+            <arg column="display_name" javaType="string"/>
+            <arg column="active" javaType="_boolean"/>
+            <arg column="password_hash" javaType="string"/>
+            <arg column="revocation_id" javaType="_long"/>
+            <arg column="role_code" javaType="cn.edu.usedcar.model.Role"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="roleRow" type="cn.edu.usedcar.mapper.AccountMapper$RoleRow">
+        <constructor>
+            <arg column="user_id" javaType="_long"/>
+            <arg column="role_code" javaType="cn.edu.usedcar.model.Role"/>
+        </constructor>
+    </resultMap>
+
+    <!-- 用当前账号的最近一次停用审计编号判断旧会话是否已撤销。 -->
+    <sql id="identitySelect">
+        SELECT u.id, u.username, u.display_name, u.active, u.password_hash,
+               (SELECT COALESCE(MAX(a.id), 0) FROM audit_log a
+                WHERE a.subject_type = 'USER' AND a.subject_id = u.id AND a.action = 'DISABLE_USER') AS revocation_id,
+               r.role_code
+        FROM app_user u LEFT JOIN user_role r ON r.user_id = u.id
+    </sql>
+    <select id="selectIdentityByUsername" resultMap="identityRow">
+        <include refid="identitySelect"/>
+        WHERE u.username = #{username}
+        ORDER BY r.role_code
+    </select>
+    <select id="selectIdentityById" resultMap="identityRow">
+        <include refid="identitySelect"/>
+        WHERE u.id = #{id}
+        ORDER BY r.role_code
+    </select>
+    <select id="selectRolesByUserIds" resultMap="roleRow">
+        SELECT user_id, role_code
+        FROM user_role
+        WHERE user_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        ORDER BY user_id, role_code
+    </select>
+    <select id="countAdministrators" resultType="long">
+        SELECT COUNT(*) FROM user_role r JOIN app_user u ON u.id = r.user_id
+        WHERE r.role_code = 'ADMIN'
+        <if test="activeOnly">
+            AND u.active = TRUE
+        </if>
+    </select>
+</mapper>

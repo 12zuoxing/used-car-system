@@ -1,18 +1,26 @@
+# 作者：pangzhihao
 server:
   address: ${APP_BIND:127.0.0.1}
   port: ${APP_PORT:8080}
   servlet:
     session:
+      # 会话标识只通过 Cookie 传递，避免进入链接和访问日志。
+      tracking-modes: cookie
       timeout: 30m
       cookie:
         http-only: true
         same-site: strict
         secure: ${APP_SECURE_COOKIE:false}
 spring:
+  jackson:
+    deserialization:
+      # 拒绝注册中额外传入的角色字段，以及使用数字指定角色枚举。
+      fail-on-unknown-properties: true
+      fail-on-numbers-for-enums: true
   datasource:
-    url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/used_car?connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true}
-    username: ${DB_USER:used_car}
-    password: ${DB_PASSWORD:}
+    url: 'jdbc:mysql://127.0.0.1:3306/used_car?connectionTimeZone=%2B08:00&forceConnectionTimeZoneToSession=true'
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:123456}
     hikari:
       transaction-isolation: TRANSACTION_READ_COMMITTED
   sql:
@@ -23,7 +31,23 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 6MB
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+springdoc:
+  paths-to-match: /api/**
+  api-docs:
+    enabled: ${APP_API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${APP_API_DOCS_ENABLED:false}
+    disable-swagger-default-url: true
+    validator-url: none
+
 app:
-  demo: ${APP_DEMO:false}
-  admin-password: ${APP_ADMIN_PASSWORD:}
-  uploads: ${APP_UPLOADS:./data/uploads}
+  admin:
+    # 只在数据库尚无管理员且启动时提供凭据的情况下初始化。
+    username: ${APP_ADMIN_USERNAME:}
+    password: ${APP_ADMIN_PASSWORD:}
+    display-name: ${APP_ADMIN_DISPLAY_NAME:系统管理员}
