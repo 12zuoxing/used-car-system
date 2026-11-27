@@ -16,7 +16,10 @@ import { auth, roleLabels } from './session.js'
           <dd class="role-list"><Tag v-for="role in auth.state.account.roles" :key="role" :value="roleLabels[role]" severity="info" /></dd>
         </div>
       </dl>
-      <RouterLink v-if="auth.isManager()" class="solid-link" :to="{ name: 'admin' }">打开管理端</RouterLink>
+      <div class="vehicle-actions">
+        <RouterLink class="solid-link" :to="{ name: 'my-vehicles' }">我的车源</RouterLink>
+        <RouterLink v-if="auth.isManager()" :to="{ name: 'admin' }">打开管理端</RouterLink>
+      </div>
     </section>
   </main>
 </template>

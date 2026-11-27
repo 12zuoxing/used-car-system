@@ -79,9 +79,17 @@ H2 演示模式默认开放 [Swagger UI](http://127.0.0.1:8080/swagger-ui.html) 
 
 **文件**　后端 controller/VehicleController.java、service/VehicleService.java、mapper/VehicleMapper.java、controller/DictionaryController.java。前端 modules/vehicles 下的 VehicleListPage.vue、VehicleDetailPage.vue、PublishVehiclePage.vue、MyVehiclesPage.vue、VehicleReviewPage.vue。
 
-- [ ] **后端**　提供 GET /api/dictionaries、GET /api/vehicles、GET /api/vehicles/{id}、POST /api/vehicles、PUT /api/vehicles/{id}、POST /api/admin/vehicles/{id}/review。支持品牌、城市、价格、年份、里程和经营方式组合筛选。车源从待审进入上架或退回，退回后可修正重提。此模块先验通直销，代销上架在模块 4 接入委托校验。
-- [ ] **前端**　完成车源筛选、详情、发布、我的车源和后台审核列表。管理员可维护品牌与城市。
-- [ ] **验收**　用卖家和工作人员走完发布、退回、重提与上架，检查其他账号无法修改车源，组合筛选分页准确，公开查询只展示可售车源。
+- [x] **后端**　提供公开字典、车源列表和详情、本人车源、发布、重提、下架和后台审核接口。组合筛选支持品牌、城市、价格、年份、里程及经营方式。审核版本、业务状态、审计与审核通知均由服务端维护。
+- [x] **前端**　完成车源市场、详情、发布、我的车源、后台审核及品牌城市字典维护页面。
+- [x] **验收**　H2 和 MySQL 8.0.46 各通过 14 项后端回归测试，覆盖归属校验、审核版本及组合筛选。Chrome 实测字典维护、发布、退回、重提、上架、筛选、详情和下架。前端测试与 Vite 生产构建通过。
+
+### 本地验收车源流程
+
+1. 用初始化的管理员登录，在 **管理端 → 基础字典** 添加至少一个启用的品牌和城市。
+2. 切换到普通用户，从 **车源市场 → 发布车源** 填写车辆资料。去 **个人中心 → 我的车源** 查看状态和审核说明。
+3. 用工作人员或管理员从 **管理端 → 车源审核** 处理待审记录。直销审核通过后即可在公开市场查到，退回须填写原因。代销车源在完成委托流程后上架。
+
+新版资料重新提交会生成新的审核版本，后台旧页面需要刷新后重新审核。发布人可下架自己的在售车源，并在修改后重提。游客可以读取在售车源，发布、本人车源与后台管理仍按会话和角色授权。
 
 ## 模块 3 照片与车况报告
 

@@ -83,7 +83,11 @@ public class SecurityConfig {
                                 "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
+                        // 公开车源仅开放列表和数字编号详情，mine 等路径仍需登录。
+                        .requestMatchers(HttpMethod.GET, "/api/dictionaries", "/api/vehicles",
+                                "/api/vehicles/{id:[0-9]+}").permitAll()
                         .requestMatchers("/api/admin/users", "/api/admin/users/**").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/dictionaries", "/api/admin/dictionaries/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "STAFF")
                         .requestMatchers("/api/**", "/ws/**").authenticated()
                         .anyRequest().denyAll())

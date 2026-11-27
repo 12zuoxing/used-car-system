@@ -13,6 +13,12 @@ export const router = createRouter({
     { path: '/login', name: 'login', component: () => import('../modules/auth/LoginPage.vue'), meta: { guestOnly: true } },
     { path: '/register', name: 'register', component: () => import('../modules/auth/RegisterPage.vue'), meta: { guestOnly: true } },
     { path: '/account', name: 'account', component: () => import('../modules/auth/AccountPage.vue'), meta: { requiresAuth: true } },
+    { path: '/vehicles', name: 'vehicle-market', component: () => import('../modules/vehicles/VehicleListPage.vue') },
+    { path: '/vehicles/:id(\\d+)', name: 'vehicle-detail', component: () => import('../modules/vehicles/VehicleDetailPage.vue') },
+    { path: '/vehicles/publish', name: 'vehicle-publish', component: () => import('../modules/vehicles/PublishVehiclePage.vue'), meta: { requiresAuth: true } },
+    { path: '/account/vehicles', name: 'my-vehicles', component: () => import('../modules/vehicles/MyVehiclesPage.vue'), meta: { requiresAuth: true } },
+    { path: '/account/vehicles/:id(\\d+)', name: 'my-vehicle-detail', component: () => import('../modules/vehicles/VehicleDetailPage.vue'), props: { managed: true }, meta: { requiresAuth: true } },
+    { path: '/account/vehicles/:id(\\d+)/edit', name: 'vehicle-edit', component: () => import('../modules/vehicles/PublishVehiclePage.vue'), meta: { requiresAuth: true } },
     {
       path: '/admin',
       component: () => import('../modules/admin/AdminLayout.vue'),
@@ -20,6 +26,8 @@ export const router = createRouter({
       children: [
         { path: '', name: 'admin', component: () => import('../modules/admin/WorkspacePage.vue') },
         { path: 'users', name: 'admin-users', component: () => import('../modules/admin/AdminUsersPage.vue'), meta: { administrator: true } },
+        { path: 'vehicles', name: 'vehicle-review', component: () => import('../modules/vehicles/VehicleReviewPage.vue') },
+        { path: 'dictionaries', name: 'admin-dictionaries', component: () => import('../modules/admin/DictionaryPage.vue'), meta: { administrator: true } },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: { name: 'home' } },

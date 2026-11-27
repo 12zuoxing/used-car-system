@@ -9,6 +9,7 @@ import Aura from '@primeuix/themes/aura'
 import App from './App.vue'
 import { router } from './router/index.js'
 import './styles/app.css'
+import './styles/vehicles.css'
 
 // 主色统一放在主题配置中。业务页面无需重复修改组件内部样式。
 const UsedCarTheme = definePreset(Aura, {

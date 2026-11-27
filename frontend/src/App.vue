@@ -33,6 +33,7 @@ async function logout() {
       </RouterLink>
       <nav class="header-links" aria-label="主导航">
         <RouterLink :to="{ name: 'home' }" class="nav-text">首页</RouterLink>
+        <RouterLink :to="{ name: 'vehicle-market' }" class="nav-text">车源市场</RouterLink>
         <template v-if="auth.state.account">
           <RouterLink :to="{ name: 'account' }" class="nav-text">个人中心</RouterLink>
           <RouterLink v-if="auth.isManager()" :to="{ name: 'admin' }" class="nav-text">管理端</RouterLink>

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 作者：pangzhihao。公共查询和管理查询使用同一筛选 SQL，私有字段按视图范围读取。 -->
+<mapper namespace="cn.edu.usedcar.mapper.VehicleMapper">
+    <resultMap id="vehicleRow" type="cn.edu.usedcar.model.VehicleRecord">
+        <constructor>
+            <idArg column="id" javaType="_long"/>
+            <arg column="brand_id" javaType="_long"/>
+            <arg column="brand_name" javaType="string"/>
+            <arg column="city_id" javaType="_long"/>
+            <arg column="city_name" javaType="string"/>
+            <arg column="model" javaType="string"/>
+            <arg column="registration_year" javaType="_int"/>
+            <arg column="mileage" javaType="_int"/>
+            <arg column="price" javaType="java.math.BigDecimal"/>
+            <arg column="transmission" javaType="cn.edu.usedcar.model.Transmission"/>
+            <arg column="fuel" javaType="cn.edu.usedcar.model.Fuel"/>
+            <arg column="sale_mode" javaType="cn.edu.usedcar.model.SaleMode"/>
+            <arg column="description" javaType="string"/>
+            <arg column="status" javaType="cn.edu.usedcar.model.VehicleStatus"/>
+            <arg column="listed_at" javaType="java.time.LocalDateTime"/>
+            <arg column="owner_name" javaType="string"/>
+            <arg column="review_note" javaType="string"/>
+            <arg column="reviewed_at" javaType="java.time.LocalDateTime"/>
+            <arg column="revision" javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="vehicleView">
+        SELECT v.id, v.brand_id, b.name AS brand_name, v.city_id, c.name AS city_name, v.model,
+               v.registration_year, v.mileage, v.price, v.transmission, v.fuel, v.sale_mode,
+               v.description, v.status, v.listed_at,
+        <choose>
+            <when test="managed">
+                u.display_name AS owner_name, v.review_note, v.reviewed_at,
+                COALESCE((SELECT MAX(a.id) FROM audit_log a
+                  WHERE a.subject_type = 'VEHICLE' AND a.subject_id = v.id AND a.action = 'SUBMIT_VEHICLE'), 0) AS revision
+            </when>
+            <otherwise>
+                NULL AS owner_name, NULL AS review_note, CAST(NULL AS DATETIME) AS reviewed_at, NULL AS revision
+            </otherwise>
+        </choose>
+        FROM vehicle v
+        JOIN brand b ON b.id = v.brand_id
+        JOIN city c ON c.id = v.city_id
+        <if test="managed">JOIN app_user u ON u.id = v.owner_id</if>
+    </sql>
+
+    <select id="selectVehiclePage" resultMap="vehicleRow">
+        <include refid="vehicleView"/>
+        <where>
+            <if test="status != null">AND v.status = #{status}</if>
+            <if test="ownerId != null">AND v.owner_id = #{ownerId}</if>
+            <if test="criteria != null">
+                <if test="criteria.brandId != null">AND v.brand_id = #{criteria.brandId}</if>
+                <if test="criteria.cityId != null">AND v.city_id = #{criteria.cityId}</if>
+                <if test="criteria.saleMode != null">AND v.sale_mode = #{criteria.saleMode}</if>
+                <if test="criteria.minPrice != null">AND v.price &gt;= #{criteria.minPrice}</if>
+                <if test="criteria.maxPrice != null">AND v.price &lt;= #{criteria.maxPrice}</if>
+                <if test="criteria.minYear != null">AND v.registration_year &gt;= #{criteria.minYear}</if>
+                <if test="criteria.maxYear != null">AND v.registration_year &lt;= #{criteria.maxYear}</if>
+                <if test="criteria.minMileage != null">AND v.mileage &gt;= #{criteria.minMileage}</if>
+                <if test="criteria.maxMileage != null">AND v.mileage &lt;= #{criteria.maxMileage}</if>
+            </if>
+        </where>
+        <choose>
+            <when test="managed">ORDER BY v.created_at DESC, v.id DESC</when>
+            <otherwise>ORDER BY v.listed_at DESC, v.id DESC</otherwise>
+        </choose>
+    </select>
+
+    <select id="selectView" resultMap="vehicleRow">
+        <include refid="vehicleView"/>
+        WHERE v.id = #{id}
+        <if test="status != null">AND v.status = #{status}</if>
+        <if test="ownerId != null">AND v.owner_id = #{ownerId}</if>
+    </select>
+</mapper>
