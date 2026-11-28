@@ -39,7 +39,8 @@ public class NotificationSocketHandler extends TextWebSocketHandler {
         }
         session.setTextMessageSizeLimit(256); // 只支持服务器刷新提示，限制浏览器发来的内容大小。
         var bounded = new ConcurrentWebSocketSessionDecorator(session, 3000, 4096); // 对并发写和缓冲积压设置边界。
-        sessions.put(session.getId(), new Connection(bounded, account.profile().id(), account.revocationId(), httpSession)); // 按握手账号登记连接。
+        sessions.put(session.getId(), new Connection(bounded, account.profile().id(), account.revocationId(),
+                httpSession, httpSession.getId())); // 记录握手身份与登录时分配的会话编号。
     }
 
     @Override
@@ -91,7 +92,8 @@ public class NotificationSocketHandler extends TextWebSocketHandler {
     private static boolean httpAlive(Connection connection) {
         try {
             connection.httpSession().getCreationTime(); // Servlet 容器在会话注销或过期后会拒绝此访问。
-            return connection.socket().isOpen(); // 同时确认真实套接字仍然打开。
+            return connection.handshakeSessionId().equals(connection.httpSession().getId())
+                    && connection.socket().isOpen(); // 会话编号轮换意味着新的登录，旧连接不能沿用。
         } catch (IllegalStateException invalidated) {
             return false; // 失效会话关联的连接不能再接收信号。
         }
@@ -110,5 +112,6 @@ public class NotificationSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    private record Connection(WebSocketSession socket, long receiverId, long revocationId, HttpSession httpSession) { } // 关联真实连接与登录状态。
+    private record Connection(WebSocketSession socket, long receiverId, long revocationId,
+                              HttpSession httpSession, String handshakeSessionId) { } // 关联真实连接和握手时的身份。
 }

@@ -40,7 +40,7 @@ defineEmits(['update:status']) // 变更筛选时由调用页面重新加载第�
         <thead>
           <tr>
             <th v-for="column in columns" :key="column.key" scope="col">{{ column.label }}</th>
-            <th scope="col">操作</th>
+            <th v-if="$slots.actions" scope="col">操作</th><!-- 只读日志无操作列。 -->
           </tr>
         </thead>
         <tbody>
@@ -49,7 +49,7 @@ defineEmits(['update:status']) // 变更筛选时由调用页面重新加载第�
             <td v-for="column in columns" :key="column.key">
               <slot :name="column.key" :entry="entry">{{ column.format ? column.format(entry) : entry[column.key] }}</slot>
             </td>
-            <td><slot name="actions" :entry="entry" /></td>
+            <td v-if="$slots.actions"><slot name="actions" :entry="entry" /></td><!-- 只有调用方提供动作时才绘制此单元格。 -->
           </tr>
         </tbody>
       </table>

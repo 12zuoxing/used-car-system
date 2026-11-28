@@ -176,9 +176,17 @@ H2 演示模式默认开放 [Swagger UI](http://127.0.0.1:8080/swagger-ui.html) 
 
 **文件**　后端 controller/NotificationController.java、service/NotificationPushService.java、config/WebSocketConfig.java、controller/AuditController.java、controller/DashboardController.java。前端 modules/notifications/NotificationsPage.vue、modules/admin/DashboardPage.vue 和 AuditLogPage.vue。
 
-- [ ] **后端**　提供 GET /api/notifications、POST /api/notifications/{id}/read、GET /api/admin/dashboard、GET /api/admin/audit-logs 和认证后的 /ws/notifications。按接收人与事件标识去重，推送失败安排重试。
-- [ ] **前端**　实现通知入口、未读状态和断线恢复刷新。后台展示待审核车源、在办订单、贷款和送修待办，提供审计日志查询。
-- [ ] **验收**　断开买家连接后改变订单状态，重连后可补读。重试只保留一条事件记录，统计值与明细一致，日志与敏感字段按权限显示。
+- [x] **后端**　提供个人通知分页、已读更新、后台统计及审计查询，并注册需要认证的同源 WebSocket。通知按接收人与事件标识去重，提交后由后台任务领取，传输失败后安排原记录重试。
+- [x] **前端**　主导航展示未读数，收件箱支持筛选、标记已读和打开关联记录。断线恢复后重新读取通知。工作台统计链接打开对应状态的队列，审计页支持按类型、编号、动作和日期筛选。
+- [x] **验收**　H2 全量 33 项、MySQL 8.0.46 专项 14 项通过，覆盖重试去重、幂等已读、统计与队列一致及审计权限。前端 5 项测试和生产构建通过。Chrome 实测同源握手、在线推送、断线后过户通知补读、工作台状态跳转、角色字段及窄屏布局。
+
+### 本地验收通知、审计与统计
+
+1. 买家打开顶部 **通知**，另用工作人员账号确认过户。在线时，页面自动刷新，并在通知列表显示办理结果和未读数量。
+2. 关闭买家标签页，在另一笔交易中由工作人员确认过户。买家重新打开通知后补读该事件，点击 **标为已读** 后核对未读数字。
+3. 工作人员从 **管理端 → 工作台** 点选状态及数量，核对车源、订单、贷款、工单对应队列。到 **操作日志** 按业务类型、编号、操作代码或日期查询。工作人员查看业务审计摘要，管理员可查看账号类日志和完整办理说明。
+
+通知正文从受保护的 HTTP 接口读取，WebSocket 帧只提示刷新。通知记录与业务事务一起落库，后台领取已提交的未读记录。失败自动安排退避重试，离线用户可在重连时立即读取列表。
 
 ## 模块 9 联调、性能与答辩交付
 

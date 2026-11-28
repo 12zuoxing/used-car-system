@@ -1,6 +1,7 @@
 <!-- @author pangzhihao -->
 <script setup>
 import { computed, onMounted, ref } from 'vue' // 管理列表条件并在进入页面时读取工单。
+import { useRoute } from 'vue-router' // 支持从后台统计进入指定状态队列。
 import Tag from 'primevue/tag' // 呈现受理状态。
 import { repairApi } from '../../api/repairs.js' // 按访问者视角使用个人或后台接口。
 import BookingTable from '../bookings/BookingTable.vue' // 复用筛选、分页与窄屏滚动。
@@ -10,7 +11,9 @@ import { repairActions, repairStages, repairStatuses } from './repairLabels.js' 
 
 const props = defineProps({ managed: { type: Boolean, default: false } }) // 后台视角需要查看申请人和经办入口。
 const stage = ref('') // 默认同时展示售前和售后记录。
-const status = ref(props.managed ? 'PENDING' : '') // 后台默认看待受理，个人默认看全部。
+const initial = useRoute().query.status // 检查是否从工作台跳转。
+const queueStatus = typeof initial === 'string' && Object.hasOwn(repairStatuses, initial) ? initial : 'PENDING' // 后台没有有效筛选时查看待受理。
+const status = ref(props.managed ? queueStatus : '') // 个人默认看全部申请。
 const page = useVehiclePage((query) => {
   const filters = { ...query, stage: stage.value, status: status.value } // 将类型和状态与分页参数一起提交。
   return props.managed ? repairApi.queue(filters) : repairApi.mine(filters) // 请求范围由对应接口验证。

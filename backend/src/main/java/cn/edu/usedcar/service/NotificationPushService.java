@@ -61,10 +61,11 @@ public class NotificationPushService {
             LOG.warn("Notification signal failed for receiver {}", receiverId, failure); // 不把消息文本写进应用日志。
             sent = false; // 保留本轮领取记录，稍后重试。
         }
+        var failureTime = sent ? null : notifications.databaseNow(); // 退避间隔从实际失败时刻开始计算。
         for (var row : claimed) {
             int attempt = row.getPushAttempts() + 1; // 取当前已经持久化的领取版本。
             if (sent) notifications.confirmPush(row.getId(), attempt); // 网络提交成功时写入推送时间。
-            else notifications.postponePush(row.getId(), attempt, now.plusSeconds(Math.min(60, 1 << Math.min(attempt, 6)))); // 失败时用有上限的指数退避重试原记录。
+            else notifications.postponePush(row.getId(), attempt, failureTime.plusSeconds(Math.min(60, 1 << Math.min(attempt, 6)))); // 失败时用有上限的指数退避重试原记录。
         }
     }
 }

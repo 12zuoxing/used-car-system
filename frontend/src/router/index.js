@@ -34,12 +34,14 @@ export const router = createRouter({
     { path: '/account/orders/:id(\\d+)/repair', name: 'after-sale-repair', component: () => import('../modules/repairs/RepairForm.vue'), props: { afterSale: true }, meta: { requiresAuth: true } },
     { path: '/account/repairs', name: 'my-repairs', component: () => import('../modules/repairs/MyRepairsPage.vue'), meta: { requiresAuth: true } },
     { path: '/account/repairs/:id(\\d+)', name: 'my-repair-detail', component: () => import('../modules/repairs/RepairDetailPage.vue'), meta: { requiresAuth: true } },
+    // 个人通知要求登录，具体记录始终由后端按接收人隔离。
+    { path: '/account/notifications', name: 'notifications', component: () => import('../modules/notifications/NotificationsPage.vue'), meta: { requiresAuth: true } },
     {
       path: '/admin',
       component: () => import('../modules/admin/AdminLayout.vue'),
       meta: { requiresAuth: true, manager: true },
       children: [
-        { path: '', name: 'admin', component: () => import('../modules/admin/WorkspacePage.vue') },
+        { path: '', name: 'admin', component: () => import('../modules/admin/DashboardPage.vue') }, // 后台首页显示各业务队列的快照。
         { path: 'users', name: 'admin-users', component: () => import('../modules/admin/AdminUsersPage.vue'), meta: { administrator: true } },
         { path: 'vehicles', name: 'vehicle-review', component: () => import('../modules/vehicles/VehicleReviewPage.vue') },
         { path: 'reports', name: 'report-review', component: () => import('../modules/reports/ReportReviewPage.vue') },
@@ -55,6 +57,7 @@ export const router = createRouter({
         // 后台路由继承 STAFF、ADMIN 角色，并使用工作人员工单接口。
         { path: 'repairs', name: 'repair-queue', component: () => import('../modules/repairs/RepairQueuePage.vue') },
         { path: 'repairs/:id(\\d+)', name: 'admin-repair-detail', component: () => import('../modules/repairs/RepairDetailPage.vue'), props: { managed: true } },
+        { path: 'audit-logs', name: 'audit-logs', component: () => import('../modules/admin/AuditLogPage.vue') }, // 操作日志继承管理端角色限制。
         { path: 'dictionaries', name: 'admin-dictionaries', component: () => import('../modules/admin/DictionaryPage.vue'), meta: { administrator: true } },
       ],
     },

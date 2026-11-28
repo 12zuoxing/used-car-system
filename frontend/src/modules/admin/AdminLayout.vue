@@ -21,6 +21,8 @@ import { auth } from '../auth/session.js'
           <RouterLink :to="{ name: 'loan-queue' }">贷款办理</RouterLink>
           <!-- 工作人员从工单队列统一办理售前和售后服务。 -->
           <RouterLink :to="{ name: 'repair-queue' }">整备与送修</RouterLink>
+          <!-- 工作人员可查询业务摘要，管理员可查询完整日志。 -->
+          <RouterLink :to="{ name: 'audit-logs' }">操作日志</RouterLink>
           <RouterLink v-if="auth.isAdministrator()" :to="{ name: 'admin-dictionaries' }">基础字典</RouterLink>
           <RouterLink v-if="auth.isAdministrator()" :to="{ name: 'admin-users' }">账号管理</RouterLink>
           <RouterLink :to="{ name: 'account' }">返回个人中心</RouterLink>

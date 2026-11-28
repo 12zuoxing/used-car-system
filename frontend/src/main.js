@@ -12,6 +12,7 @@ import './styles/app.css'
 import './styles/vehicles.css'
 import './styles/bookings.css' // 加载代销与预约列表的共用排版。
 import './styles/orders.css' // 统一订单金额、状态和详情卡片的排版。
+import './styles/operations.css' // 应用通知收件箱、审计和后台工作台样式。
 
 // 主色统一放在主题配置中。业务页面无需重复修改组件内部样式。
 const UsedCarTheme = definePreset(Aura, {

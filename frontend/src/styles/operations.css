@@ -1,0 +1,110 @@
+/* 作者 pangzhihao。通知收件箱和后台工作台沿用项目的卡片系统。 */
+
+.notification-link {
+  display: inline-flex; /* 把短标签与未读计数保留在同一导航项。 */
+  align-items: center; /* 计数与文字垂直居中。 */
+  gap: 5px; /* 留出容易辨认的未读标记间距。 */
+}
+
+.notification-count {
+  background: var(--blue); /* 用品牌蓝区分未读标记。 */
+  color: var(--white); /* 保持可读对比度。 */
+  border-radius: 10px; /* 让多位数字也能使用同一轮廓。 */
+  padding: 1px 6px; /* 避免窄屏出现过大的导航标记。 */
+  font-size: 12px; /* 让数字次于主导航标签。 */
+  font-variant-numeric: tabular-nums; /* 视觉上对齐更新后的数字。 */
+}
+
+.vehicle-toolbar label.notification-filter {
+  display: flex; /* 使用水平方式呈现复选框和标签。 */
+  align-items: center; /* 按复选框中心对齐文字。 */
+  gap: 6px; /* 为可点击文字留出间距。 */
+}
+
+.notification-items {
+  margin: 0; /* 让收件箱和现有分页对齐。 */
+  padding: 0; /* 用通知行取代默认列表缩进。 */
+  list-style: none; /* 用语义列表保留屏幕阅读器导航。 */
+}
+
+.notification-items li {
+  display: flex; /* 正文靠左，详情与标记动作靠右。 */
+  align-items: center; /* 与消息块中心对齐操作。 */
+  justify-content: space-between; /* 保持两侧操作易于区分。 */
+  gap: 10px 24px; /* 在窄屏留出动作换行空间。 */
+  flex-wrap: wrap; /* 正文很长时允许动作进入下一行。 */
+  padding: 13px 0; /* 留出每行的阅读区域。 */
+  border-top: 1px solid var(--line); /* 分隔相邻消息。 */
+}
+
+.notification-copy {
+  min-width: 0; /* 允许正文容器随屏幕宽度收缩。 */
+  overflow-wrap: anywhere; /* 单个长词也能正常换行。 */
+}
+
+.notification-copy p {
+  margin: 6px 0 0; /* 正文与时间标签保持紧凑。 */
+}
+
+.notification-copy time {
+  color: var(--muted); /* 时间作为次要信息。 */
+  font-size: 13px; /* 与同站点的摘要文字一致。 */
+}
+
+.dashboard-grid {
+  display: grid; /* 用规则列对齐各业务统计卡片。 */
+  grid-template-columns: repeat(2, minmax(0, 1fr)); /* 桌面工作台显示两列。 */
+  gap: 14px; /* 卡片之间保持统一间距。 */
+}
+
+.dashboard-card {
+  display: grid; /* 对齐标题、总数和对应工作队列。 */
+  align-content: start; /* 让不同行数的卡片从相同位置开始。 */
+  gap: 6px; /* 拉开标题与计数的距离。 */
+  min-width: 0; /* 保持小屏幕可正常折行。 */
+  padding: 16px; /* 为卡片标签保留阅读空间。 */
+  background: var(--white); /* 使用项目的卡片底色。 */
+  border: 1px solid var(--line); /* 与后台列表区分。 */
+  border-radius: 10px; /* 保留整体卡片风格。 */
+}
+
+.dashboard-card h2 {
+  margin: 0; /* 标题与总数的距离交给网格。 */
+  font-size: 17px; /* 保持各业务标题的统一层级。 */
+}
+
+.dashboard-count {
+  color: var(--blue); /* 突出当前真实业务计数。 */
+  font-size: 32px; /* 在工作台中优先显示总量。 */
+  line-height: 1.2; /* 保持数字区域紧凑。 */
+}
+
+.dashboard-card ul {
+  margin: 6px 0 0; /* 在合计与状态明细之间留一点空间。 */
+  padding: 0; /* 状态项与卡片内其他文字对齐。 */
+  list-style: none; /* 使用真实可跳转的状态行代替圆点。 */
+}
+
+.dashboard-card li a {
+  display: flex; /* 将标签和数量分列对齐。 */
+  justify-content: space-between; /* 状态名称靠左，计数靠右。 */
+  gap: 8px; /* 长文字可在小屏自动换行。 */
+  padding: 8px 0; /* 保留整行可点击区域。 */
+  border-top: 1px solid var(--line); /* 分隔可选择的业务状态明细。 */
+}
+
+.audit-code, .audit-note {
+  overflow-wrap: anywhere; /* 让较长操作代码和说明能控制表宽。 */
+}
+
+.audit-note {
+  display: block; /* 限制审计正文列的阅读宽度。 */
+  max-width: 360px; /* 保持操作时间和对象列不被说明撑开。 */
+  white-space: pre-wrap; /* 保留经办说明的有效换行。 */
+}
+
+@media (max-width: 640px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr; /* 窄屏改为单列，确保状态链接可点击。 */
+  }
+}

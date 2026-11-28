@@ -323,6 +323,70 @@ abstract class TradeOrderWorkflowTests {
     }
 
     @Test
+    void notificationInboxUsesRecipientAndReadIsIdempotent() throws Exception {
+        var admin = login("order_admin"); // 用审核角色建立实际交易。
+        var seller = user(); // 卖家接收自己的订单通知。
+        var buyer = user(); // 买家收到模拟付款成功通知。
+        var car = listed(admin, seller, "DIRECT"); // 通过正常业务创建在售车源。
+        long order = id(postOrder(buyer, car.id(), token()).andExpect(status().isCreated())); // 锁车时先通知卖家。
+        mvc.perform(get("/api/notifications").session(buyer.session())).andExpect(status().isOk())
+                .andExpect(jsonPath("$.unreadCount").value(0)); // 买家与卖家的通知分开读取。
+        submit(post("/api/orders/" + order + "/pay"), buyer.session(), null).andExpect(status().isOk()); // 触发真实业务通知。
+        var inbox = read(mvc.perform(get("/api/notifications").param("unreadOnly", "true").session(buyer.session()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.unreadCount").value(1))
+                .andExpect(jsonPath("$.items[0].subjectId").value(order))); // 即使没有连接在线，也能通过列表补读。
+        long notice = inbox.get("items").get(0).get("id").asLong(); // 读取这条通知的业务编号。
+        mvc.perform(get("/api/notifications")).andExpect(status().isUnauthorized()); // 匿名不能读取通知。
+        mvc.perform(get("/ws/notifications")).andExpect(status().isUnauthorized()); // WebSocket 握手要求已登录会话。
+        submit(post("/api/notifications/" + notice + "/read"), seller.session(), null).andExpect(status().isNotFound()); // 他人不能代标已读。
+        submit(post("/api/notifications/" + notice + "/read"), buyer.session(), null).andExpect(status().isNoContent()); // 本人可标记已读。
+        var time = jdbc.queryForObject("SELECT read_at FROM notification WHERE id = ?", LocalDateTime.class, notice); // 保存第一次标记的数据库时间。
+        submit(post("/api/notifications/" + notice + "/read"), buyer.session(), null).andExpect(status().isNoContent()); // 重复请求返回同样的成功结果。
+        assertThat(jdbc.queryForObject("SELECT read_at FROM notification WHERE id = ?", LocalDateTime.class, notice)).isEqualTo(time); // 不覆盖首次已读时间。
+        mvc.perform(get("/api/notifications").param("unreadOnly", "true").session(buyer.session()))
+                .andExpect(jsonPath("$.total").value(0)).andExpect(jsonPath("$.unreadCount").value(0)); // 已读后从未读列表移除。
+        mvc.perform(get("/api/notifications").session(buyer.session())).andExpect(jsonPath("$.items[0].readAt").exists())
+                .andExpect(jsonPath("$.items[0].eventKey").doesNotExist()); // 历史保留，内部去重标识不进入客户端。
+    }
+
+    @Test
+    void dashboardCountsMatchQueuesAndAuditHidesRestrictedDetails() throws Exception {
+        var admin = login("order_admin"); // 管理员可查看账号安全审计和完整说明。
+        var staff = user(); // 工作人员可查看工作台及业务审计摘要。
+        var member = user(); // 普通账号用于验证后台访问限制。
+        submit(put("/api/admin/users/" + staff.id() + "/roles"), admin, "{\"roles\":[\"STAFF\"]}").andExpect(status().isOk()); // 通过实际接口完成角色授权。
+        var vehicle = listed(admin, member, "DIRECT"); // 生成一组真实车源审核日志。
+        postOrder(staff, vehicle.id(), token()).andExpect(status().isCreated()); // 生成一个实际在办订单。
+        jdbc.update("INSERT INTO audit_log (actor_id, action, subject_type, subject_id, detail) VALUES (?, ?, ?, ?, ?)",
+                member.id(), "SUBMIT_VEHICLE", "VEHICLE", vehicle.id(), "用于核对权限的私密审计说明"); // 模拟历史自由文本记录。
+        var dashboard = read(mvc.perform(get("/api/admin/dashboard").session(staff.session())).andExpect(status().isOk())); // 读取当前工作台快照。
+        assertThat(dashboard.get("pendingVehicles").asLong()).isEqualTo(queueTotal("/api/admin/vehicles", "PENDING", admin)); // 待审车辆与队列一致。
+        assertThat(dashboard.get("lockedOrders").asLong()).isEqualTo(queueTotal("/api/admin/orders", "LOCKED", admin)); // 待付款订单与队列一致。
+        assertThat(dashboard.get("paidOrders").asLong()).isEqualTo(queueTotal("/api/admin/orders", "PAID", admin)); // 待过户订单与队列一致。
+        assertThat(dashboard.get("pendingLoans").asLong()).isEqualTo(queueTotal("/api/admin/loans", "PENDING", admin)); // 待处理贷款与队列一致。
+        assertThat(dashboard.get("processingLoans").asLong()).isEqualTo(queueTotal("/api/admin/loans", "PROCESSING", admin)); // 办理中贷款与队列一致。
+        assertThat(dashboard.get("pendingRepairs").asLong()).isEqualTo(queueTotal("/api/admin/repairs", "PENDING", admin)); // 待受理工单与队列一致。
+        assertThat(dashboard.get("processingRepairs").asLong()).isEqualTo(queueTotal("/api/admin/repairs", "PROCESSING", admin)); // 处理中的工单与队列一致。
+        mvc.perform(get("/api/admin/dashboard").session(member.session())).andExpect(status().isForbidden()); // 普通账号无法访问统计。
+        String audit = "/api/admin/audit-logs"; // 审计分页的访问路径。
+        mvc.perform(get(audit).session(member.session())).andExpect(status().isForbidden()); // 普通账号无法访问操作日志。
+        mvc.perform(get(audit).session(staff.session()).param("subjectType", "USER"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(0)); // 工作人员不能通过筛选读取账号安全事件。
+        mvc.perform(get(audit).session(staff.session()).param("subjectType", "VEHICLE").param("subjectId", Long.toString(vehicle.id())))
+                .andExpect(jsonPath("$.items[0].action").value("SUBMIT_VEHICLE"))
+                .andExpect(jsonPath("$.items[0].detail").doesNotExist()); // 工作人员只得到业务事件的结构化信息。
+        mvc.perform(get(audit).session(admin).param("subjectType", "VEHICLE").param("subjectId", Long.toString(vehicle.id())))
+                .andExpect(jsonPath("$.items[0].detail").value("用于核对权限的私密审计说明")); // 管理员可核查原审计说明。
+        mvc.perform(get(audit).session(admin).param("subjectType", "USER").param("action", "CHANGE_USER_ROLES"))
+                .andExpect(jsonPath("$.items[?(@.subjectId == " + staff.id() + ")]").isNotEmpty()); // 管理员可以复核角色变更。
+    }
+
+    private long queueTotal(String path, String state, MockHttpSession actor) throws Exception {
+        return read(mvc.perform(get(path).param("status", state).param("pageSize", "1").session(actor))
+                .andExpect(status().isOk())).get("total").asLong(); // 读取实际状态队列分页的总量。
+    }
+
+    @Test
     void concurrentRequestsProduceOnlyOneOrderAndOneLock() throws Exception {
         var admin = login("order_admin"); // 使用真实的上架流程准备同一辆车。
         var seller = user(); // 为车源提供独立卖家身份。

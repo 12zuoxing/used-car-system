@@ -1,11 +1,14 @@
 <!-- @author pangzhihao -->
 <script setup>
 import { onMounted, ref } from 'vue' // 在页面挂载时加载后台订单。
+import { useRoute } from 'vue-router' // 让工作台状态链接可以打开对应队列。
 import { orderApi } from '../../api/orders.js' // 通过已授权的后台接口读取队列。
 import { useVehiclePage } from '../vehicles/useVehiclePage.js' // 使用统一分页组合函数。
 import OrderTable from './OrderTable.vue' // 显示后台订单的当前状态与处理入口。
+import { orderStatuses } from './orderLabels.js' // 仅接受真实存在的订单状态。
 
-const status = ref('PAID') // 优先展示等待工作人员确认过户的订单。
+const initial = useRoute().query.status // 读取从待办统计页带入的查找条件。
+const status = ref(typeof initial === 'string' && Object.hasOwn(orderStatuses, initial) ? initial : 'PAID') // 从统计页来时选中该状态，否则优先展示待过户。
 const page = useVehiclePage((query) => orderApi.queue({ ...query, status: status.value }), 10) // 让后端按状态搜索分页。
 const columns = [
   { key: 'vehicleModel', label: '车辆 / 订单' }, // 显示车源名称和订单编号。
