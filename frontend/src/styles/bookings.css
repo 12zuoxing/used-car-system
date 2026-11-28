@@ -1,0 +1,54 @@
+/* 作者 pangzhihao。预约和委托页面复用车源表单与后台视觉样式。 */
+
+/* 为标题、通知和列表留出一致的垂直间距。 */
+.booking-section {
+  display: grid; /* 让卡片内每个区块占据一行。 */
+  gap: 14px; /* 控制输入区及操作反馈之间的距离。 */
+  min-width: 0; /* 允许卡片随父容器缩小。 */
+}
+
+/* 将公开页面的标题和业务卡片沿纵向排布。 */
+.booking-page {
+  display: grid; /* 将返回链接、标题、表单及历史依次排列。 */
+  gap: 18px; /* 使用与车辆详情一致的内容节奏。 */
+}
+
+/* 将表格滚动限制在列表自身。 */
+.booking-table-section,
+.booking-table-scroll {
+  min-width: 0; /* 防止长行扩大整个页面宽度。 */
+}
+.booking-table-scroll {
+  overflow-x: auto; /* 允许手机用户滑动查看右侧操作。 */
+  border: 1px solid var(--line); /* 延用项目中的卡片描边。 */
+  border-radius: 10px; /* 与现有详情卡片的圆角匹配。 */
+}
+
+/* 为车型、时间、状态和操作保留稳定的对齐方式。 */
+.booking-table {
+  width: 100%; /* 宽屏时填满内容区。 */
+  min-width: 530px; /* 窄屏保留日期及动作标签的可读性。 */
+  border-collapse: collapse; /* 相邻记录共享同一分隔线。 */
+  background: var(--white); /* 表格沿用白色卡片底。 */
+}
+.booking-table :is(th, td) {
+  padding: 9px 12px; /* 让行高和按钮有足够空间。 */
+  text-align: left; /* 中文说明与日期左对齐。 */
+  border-bottom: 1px solid var(--line); /* 用细线标出记录边界。 */
+}
+.booking-table th {
+  background: var(--background); /* 用浅色区分表头。 */
+  font-weight: 600; /* 让列标题易于查找。 */
+}
+.booking-table td > .p-tag {
+  white-space: nowrap; /* 保持复合状态标签完整。 */
+}
+.booking-table tbody tr:last-child td {
+  border-bottom: 0; /* 底边交给容器绘制，避免加重。 */
+}
+
+/* 对话框资料和表单共享浏览时的换行规则。 */
+.booking-section .vehicle-description {
+  margin: 0; /* 统一由网格间距控制段落之间的距离。 */
+  overflow-wrap: anywhere; /* 长备注在窄屏自动折行。 */
+}

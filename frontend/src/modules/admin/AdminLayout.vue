@@ -12,6 +12,9 @@ import { auth } from '../auth/session.js'
           <RouterLink :to="{ name: 'admin' }">工作台</RouterLink>
           <RouterLink :to="{ name: 'vehicle-review' }">车源审核</RouterLink>
           <RouterLink :to="{ name: 'report-review' }">车况报告</RouterLink>
+          <!-- 业务队列继承管理布局的工作人员权限。 -->
+          <RouterLink :to="{ name: 'consignment-review' }">代销委托</RouterLink>
+          <RouterLink :to="{ name: 'appointment-queue' }">看车预约</RouterLink>
           <RouterLink v-if="auth.isAdministrator()" :to="{ name: 'admin-dictionaries' }">基础字典</RouterLink>
           <RouterLink v-if="auth.isAdministrator()" :to="{ name: 'admin-users' }">账号管理</RouterLink>
           <RouterLink :to="{ name: 'account' }">返回个人中心</RouterLink>

@@ -120,7 +120,10 @@ onMounted(() => page.load())
         <VehicleGallery v-else :photos="photos" compact />
         <template v-if="target.status === 'PENDING'">
           <label class="vehicle-dialog-label">审核说明<textarea v-model="note" rows="3" maxlength="500" placeholder="退回时必须填写原因" /></label>
-          <Message v-if="target.saleMode === 'CONSIGN'" severity="warn" :closable="false">代销车源需完成委托后才能上架。</Message>
+          <!-- 审核代销车源前，可跳转到后台核对委托是否已生效。 -->
+          <Message v-if="target.saleMode === 'CONSIGN'" severity="info" :closable="false">
+            代销上架需要有效委托。<RouterLink :to="{ name: 'consignment-review' }">查看代销委托</RouterLink>
+          </Message>
         </template>
         <p v-else-if="target.reviewNote" class="vehicle-description">审核说明：{{ target.reviewNote }}</p>
         <Message v-if="reviewError" severity="error" :closable="false">{{ reviewError }}</Message>
@@ -129,7 +132,8 @@ onMounted(() => page.load())
         <Button label="关闭" severity="secondary" variant="outlined" :disabled="saving" @click="showReview = false" />
         <template v-if="target?.status === 'PENDING'">
           <Button label="退回修改" severity="danger" variant="outlined" :disabled="saving" @click="review('REJECT')" />
-          <Button label="通过并上架" :loading="saving" :disabled="target.saleMode === 'CONSIGN' || readingPhotos || Boolean(photoError)" @click="review('APPROVE')" />
+          <!-- 直销和代销使用同一上架入口，服务端实时检查委托资格。 -->
+          <Button label="通过并上架" :loading="saving" :disabled="readingPhotos || Boolean(photoError)" @click="review('APPROVE')" />
         </template>
       </template>
     </Dialog>

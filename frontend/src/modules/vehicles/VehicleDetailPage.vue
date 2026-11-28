@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
 import { vehicleApi } from '../../api/vehicles.js'
+import AppointmentForm from '../appointments/AppointmentForm.vue' // 公共详情可发起看车预约。
 import VehicleMediaPanel from './VehicleMediaPanel.vue'
 import { canEdit, formatMileage, formatPrice, fuels, saleModes, statuses, transmissions, vehicleTitle } from './vehicleLabels.js'
 
@@ -53,6 +54,14 @@ watch(() => [route.params.id, props.managed], load, { immediate: true })
           </dl>
         </section>
         <section class="vehicle-panel"><h2>车辆描述</h2><p class="vehicle-description">{{ vehicle.description }}</p></section>
+        <!-- 市场详情只展示仍在售的车辆，预约表单再按会话显示登录或提交入口。 -->
+        <AppointmentForm v-if="!managed" :key="'appointment-' + vehicle.id" :vehicle-id="vehicle.id" />
+        <!-- 卖家从自己的代销车详情进入委托表单和历史。 -->
+        <section v-else-if="vehicle.saleMode === 'CONSIGN'" class="vehicle-panel booking-section">
+          <h2>代销委托</h2>
+          <p class="muted-text">车源上架需要当前有效的委托。你可以提交委托或查看审核结果。</p>
+          <div><RouterLink class="solid-link" :to="{ name: 'my-consignments', params: { id: vehicle.id } }">办理代销委托</RouterLink></div>
+        </section>
         <section v-if="managed && (vehicle.reviewNote || canEdit(vehicle))" class="vehicle-panel">
           <h2>审核与发布</h2>
           <p v-if="vehicle.reviewNote" class="vehicle-description">{{ vehicle.reviewNote }}</p>

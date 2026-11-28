@@ -27,10 +27,35 @@
         </constructor>
     </resultMap>
 
+    <!-- 公共列表、详情和附件共用代销有效性条件，直销只需满足在售状态。 -->
+    <sql id="eligibleSaleMode">
+        (v.sale_mode = 'DIRECT' OR EXISTS (
+            SELECT 1 FROM consignment cons
+            WHERE cons.vehicle_id = v.id AND cons.owner_id = v.owner_id
+              AND cons.status = 'APPROVED' AND cons.starts_at &lt;= #{businessNow}
+              AND cons.expires_at &gt; #{businessNow}
+        ))
+    </sql>
+
+    <!-- 实时把无有效委托的上架车显示为已下架，查询不写数据库。 -->
+    <sql id="effectiveStatus">
+        CASE WHEN v.status = 'LISTED' AND NOT <include refid="eligibleSaleMode"/> THEN 'OFFLINE' ELSE v.status END
+    </sql>
+
+    <!-- 公开读取和管理读取在这里应用各自的状态筛选。 -->
+    <sql id="filterState">
+        <choose>
+            <!-- 管理端按界面显示的有效状态筛选，包括自然失效的代销车。 -->
+            <when test="managed and status != null">AND (<include refid="effectiveStatus"/>) = #{status}</when>
+            <!-- 公开侧同时核对持久化上架状态和当前代销资格。 -->
+            <when test="!managed">AND v.status = 'LISTED' AND <include refid="eligibleSaleMode"/></when>
+        </choose>
+    </sql>
+
     <sql id="vehicleView">
         SELECT v.id, v.brand_id, b.name AS brand_name, v.city_id, c.name AS city_name, v.model,
                v.registration_year, v.mileage, v.price, v.transmission, v.fuel, v.sale_mode,
-               v.description, v.status, v.listed_at,
+               v.description, <include refid="effectiveStatus"/> AS status, v.listed_at,
         <choose>
             <when test="managed">
                 u.display_name AS owner_name, v.review_note, v.reviewed_at,
@@ -52,7 +77,7 @@
     <select id="selectVehiclePage" resultMap="vehicleRow">
         <include refid="vehicleView"/>
         <where>
-            <if test="status != null">AND v.status = #{status}</if>
+            <include refid="filterState"/> <!-- 应用公开或管理端状态筛选。 -->
             <if test="ownerId != null">AND v.owner_id = #{ownerId}</if>
             <if test="criteria != null">
                 <if test="criteria.brandId != null">AND v.brand_id = #{criteria.brandId}</if>
@@ -75,7 +100,13 @@
     <select id="selectView" resultMap="vehicleRow">
         <include refid="vehicleView"/>
         WHERE v.id = #{id}
-        <if test="status != null">AND v.status = #{status}</if>
+        <include refid="filterState"/> <!-- 与列表使用一致的可见范围。 -->
         <if test="ownerId != null">AND v.owner_id = #{ownerId}</if>
+    </select>
+
+    <!-- 媒体列表可通过布尔查询校验车源是否仍可公开读取。 -->
+    <select id="isPublic" resultType="boolean">
+        SELECT EXISTS (SELECT 1 FROM vehicle v WHERE v.id = #{id}
+            AND v.status = 'LISTED' AND <include refid="eligibleSaleMode"/>)
     </select>
 </mapper>

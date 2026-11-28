@@ -4,7 +4,7 @@
  */
 import { http } from './http.js'
 
-function withQuery(path, values = {}) {
+export function withQuery(path, values = {}) { // 代销和预约也复用同一套分页筛选序列化。
   const params = new URLSearchParams()
   for (const [name, value] of Object.entries(values)) {
     if (value !== '' && value != null) params.set(name, String(value))

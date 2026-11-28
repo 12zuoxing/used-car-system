@@ -19,6 +19,10 @@ export const router = createRouter({
     { path: '/account/vehicles', name: 'my-vehicles', component: () => import('../modules/vehicles/MyVehiclesPage.vue'), meta: { requiresAuth: true } },
     { path: '/account/vehicles/:id(\\d+)', name: 'my-vehicle-detail', component: () => import('../modules/vehicles/VehicleDetailPage.vue'), props: { managed: true }, meta: { requiresAuth: true } },
     { path: '/account/vehicles/:id(\\d+)/edit', name: 'vehicle-edit', component: () => import('../modules/vehicles/PublishVehiclePage.vue'), meta: { requiresAuth: true } },
+    // 车主登录后可直接打开指定车辆的委托表单和审核历史。
+    { path: '/account/vehicles/:id(\\d+)/consignments', name: 'my-consignments', component: () => import('../modules/consignments/ConsignmentPage.vue'), meta: { requiresAuth: true } },
+    // 个人中心的预约列表只展示当前会话的买家记录。
+    { path: '/account/appointments', name: 'my-appointments', component: () => import('../modules/appointments/MyAppointmentsPage.vue'), meta: { requiresAuth: true } },
     {
       path: '/admin',
       component: () => import('../modules/admin/AdminLayout.vue'),
@@ -28,6 +32,9 @@ export const router = createRouter({
         { path: 'users', name: 'admin-users', component: () => import('../modules/admin/AdminUsersPage.vue'), meta: { administrator: true } },
         { path: 'vehicles', name: 'vehicle-review', component: () => import('../modules/vehicles/VehicleReviewPage.vue') },
         { path: 'reports', name: 'report-review', component: () => import('../modules/reports/ReportReviewPage.vue') },
+        // 继承管理端的角色检查，再延迟加载委托和预约队列。
+        { path: 'consignments', name: 'consignment-review', component: () => import('../modules/consignments/ConsignmentReviewPage.vue') },
+        { path: 'appointments', name: 'appointment-queue', component: () => import('../modules/appointments/AppointmentQueuePage.vue') },
         { path: 'dictionaries', name: 'admin-dictionaries', component: () => import('../modules/admin/DictionaryPage.vue'), meta: { administrator: true } },
       ],
     },

@@ -40,6 +40,8 @@ class VehicleIntegrationTest {
     @Autowired private MockMvc mvc;
     @Autowired private ObjectMapper json;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private cn.edu.usedcar.service.ConsignmentService consignments; // 直接验证下一模块复用的下单资格入口。
+    @Autowired private org.springframework.transaction.PlatformTransactionManager transactions; // 让资格检查使用与下单相同的事务边界。
     @org.junit.jupiter.api.io.TempDir
     static java.nio.file.Path uploadDirectory;
 
@@ -251,6 +253,117 @@ class VehicleIntegrationTest {
                 .andExpect(status().isBadRequest());
         call(post("/api/vehicles"), seller.session(), vehicle(brand, city, "DIRECT", "未来车型", 9999, "50000"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void consignmentRequiresOwnerReviewAndCurrentTermBeforePublication() throws Exception {
+        // 管理员负责两次审核，卖家提交委托，买家仅能访问公开资料。
+        var admin = login("test_admin");
+        var seller = register();
+        var buyer = register();
+        var brand = dictionary(admin, "BRAND");
+        var city = dictionary(admin, "CITY");
+        var car = read(call(post("/api/vehicles"), seller.session(), vehicle(brand, city, "CONSIGN", "代销测试", 2022, "55000"))
+                .andExpect(status().isCreated()));
+        long id = car.get("id").asLong();
+        long photo = read(call(multipart("/api/vehicles/" + id + "/attachments")
+                .file(new MockMultipartFile("file", "实拍.png", "image/png", png())), seller.session(), null)
+                .andExpect(status().isCreated())).get("id").asLong();
+        var now = java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Shanghai"));
+        var draft = json.createObjectNode().put("startsAt", now.plusHours(1).toString()) // 先登记未来才开始的委托。
+                .put("expiresAt", now.plusDays(3).toString()).put("fee", 1000).put("terms", "费用从成交价中扣除").toString();
+        String submit = "/api/vehicles/" + id + "/consignments";
+        call(post(submit), buyer.session(), draft).andExpect(status().isNotFound());
+        long agreement = read(call(post(submit), seller.session(), draft).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("PENDING"))).get("id").asLong();
+        call(post(submit), seller.session(), draft).andExpect(status().isConflict());
+        mvc.perform(get(submit).session(buyer.session())).andExpect(status().isNotFound());
+        var approve = "{\"decision\":\"APPROVE\"}";
+        String reviewAgreement = "/api/admin/consignments/" + agreement + "/review";
+        call(post(reviewAgreement), seller.session(), approve).andExpect(status().isForbidden());
+        call(post(reviewAgreement), admin, approve).andExpect(status().isOk());
+        call(post(reviewAgreement), admin, approve).andExpect(status().isConflict());
+        call(post(submit), seller.session(), draft).andExpect(status().isConflict());
+        // 委托和车辆独立审核，委托通过后仍须完成车源审核。
+        mvc.perform(get("/api/vehicles/" + id)).andExpect(status().isNotFound());
+        String publish = "/api/admin/vehicles/" + id + "/review"; // 保存车源审核路径以便验证两个时间点。
+        long revision = read(mvc.perform(get("/api/vehicles/mine/" + id).session(seller.session())))
+                .get("revision").asLong(); // 上传新照片后读取最新的车源审核版本。
+        String review = review(revision, "APPROVE", ""); // 在同一版本上分别测试未开始与已开始的上架结果。
+        call(post(publish), admin, review).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONSIGNMENT_REQUIRED"));
+        jdbc.update("UPDATE consignment SET starts_at = ? WHERE id = ?", now.minusHours(1), agreement); // 模拟委托开始时间已到，避免让测试等待。
+        call(post(publish), admin, review)
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("LISTED"));
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(transactions); // 在独立事务模拟订单服务。
+        Long orderAgreement = transaction.execute(ignored -> consignments.requireForOrder(id)); // 检查真实下单锁会取得有效委托。
+        assertThat(orderAgreement).isEqualTo(agreement); // 交易必须引用本车已审核且有效的委托。
+        mvc.perform(get("/api/vehicles/" + id)).andExpect(status().isOk());
+        mvc.perform(get("/api/attachments/" + photo)).andExpect(status().isOk());
+        var lateVisit = json.createObjectNode().put("visitAt", now.plusDays(4).toString()).toString(); // 预约时间晚于代销截止日期。
+        call(post("/api/vehicles/" + id + "/appointments"), buyer.session(), lateVisit).andExpect(status().isBadRequest());
+        // 用真实订单行验证即使车辆未被标记锁定，交易中也不能撤回委托。
+        jdbc.update("INSERT INTO trade_order (vehicle_id, buyer_id, seller_id, consignment_id, request_key, amount) VALUES (?, ?, ?, ?, ?, ?)",
+                id, buyer.id(), seller.id(), agreement, suffix(), 55000);
+        String withdraw = "/api/consignments/" + agreement + "/withdraw";
+        call(post(withdraw), seller.session(), null).andExpect(status().isConflict());
+        jdbc.update("UPDATE trade_order SET status = 'CANCELLED' WHERE vehicle_id = ?", id);
+        // 将有效期改为已过去，验证全站读路径都会立即隐藏过期代销。
+        jdbc.update("UPDATE consignment SET expires_at = ? WHERE id = ?", now.minusMinutes(10), agreement);
+        mvc.perform(get("/api/vehicles/" + id)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/attachments/" + photo)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/vehicles/" + id + "/attachments")).andExpect(status().isNotFound());
+        mvc.perform(get("/api/vehicles").param("brandId", Long.toString(brand))).andExpect(jsonPath("$.total").value(0));
+        mvc.perform(get(submit).session(seller.session())).andExpect(jsonPath("$.items[0].status").value("EXPIRED"));
+        mvc.perform(get("/api/admin/consignments").param("status", "EXPIRED").session(admin))
+                .andExpect(jsonPath("$.items[?(@.id == " + agreement + ")]").isNotEmpty());
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> transaction.execute(ignored -> consignments.requireForOrder(id)))
+                .isInstanceOf(cn.edu.usedcar.common.ApiException.class).hasMessageContaining("需要当前有效的委托"); // 已过期记录不能用于下单。
+        mvc.perform(get("/api/vehicles/mine/" + id).session(seller.session())).andExpect(jsonPath("$.status").value("OFFLINE")); // 个人视图响应自然下架。
+        long renewal = read(call(post(submit), seller.session(), draft).andExpect(status().isCreated())).get("id").asLong(); // 到期后允许提交新的申请。
+        call(post("/api/consignments/" + renewal + "/withdraw"), buyer.session(), null).andExpect(status().isNotFound()); // 买家不能撤回卖家的委托。
+        call(post("/api/consignments/" + renewal + "/withdraw"), seller.session(), null)
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("WITHDRAWN")); // 卖家可撤回自己的待审核委托。
+    }
+
+    @Test
+    void appointmentEnforcesTimeOwnershipAndHandlingState() throws Exception {
+        // 用独立买卖账号验证预约只向本人和工作人员开放。
+        var admin = login("test_admin");
+        var seller = register();
+        var buyer = register();
+        var stranger = register();
+        var car = read(call(post("/api/vehicles"), seller.session(), vehicle(dictionary(admin, "BRAND"),
+                dictionary(admin, "CITY"), "DIRECT", "预约测试", 2022, "55000")).andExpect(status().isCreated()));
+        long id = car.get("id").asLong();
+        String submit = "/api/vehicles/" + id + "/appointments";
+        var now = java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Shanghai"));
+        var future = json.createObjectNode().put("visitAt", now.plusDays(1).toString()).put("note", "想检查底盘").toString();
+        call(post(submit), buyer.session(), future).andExpect(status().isNotFound());
+        call(post("/api/admin/vehicles/" + id + "/review"), admin, review(car.get("revision").asLong(), "APPROVE", ""))
+                .andExpect(status().isOk());
+        call(post(submit), seller.session(), future).andExpect(status().isBadRequest());
+        call(post(submit), buyer.session(), json.createObjectNode().put("visitAt", now.minusHours(1).toString()).toString())
+                .andExpect(status().isBadRequest());
+        long booking = read(call(post(submit), buyer.session(), future).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("PENDING"))).get("id").asLong();
+        call(post(submit), buyer.session(), future).andExpect(status().isConflict());
+        mvc.perform(get("/api/appointments").session(stranger.session())).andExpect(jsonPath("$.total").value(0));
+        mvc.perform(get("/api/appointments").session(buyer.session())).andExpect(jsonPath("$.items[0].note").value("想检查底盘"));
+        mvc.perform(get("/api/admin/appointments").session(buyer.session())).andExpect(status().isForbidden());
+        String cancel = "/api/appointments/" + booking + "/cancel";
+        String handle = "/api/admin/appointments/" + booking + "/handle";
+        call(post(cancel), stranger.session(), null).andExpect(status().isNotFound());
+        call(post(handle), admin, "{\"status\":\"COMPLETED\"}").andExpect(status().isConflict());
+        call(post(handle), admin, "{\"status\":\"CONFIRMED\",\"note\":\"请在展厅签到\"}")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CONFIRMED"));
+        call(post(handle), admin, "{\"status\":\"COMPLETED\"}").andExpect(status().isConflict());
+        call(post(cancel), buyer.session(), null).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
+        call(post(cancel), buyer.session(), null).andExpect(status().isConflict());
+        long next = read(call(post(submit), buyer.session(), future).andExpect(status().isCreated())).get("id").asLong();
+        call(post("/api/admin/appointments/" + next + "/handle"), admin, "{\"status\":\"CONFIRMED\"}").andExpect(status().isOk());
+        jdbc.update("UPDATE appointment SET visit_at = ? WHERE id = ?", now.minusMinutes(5), next);
+        call(post("/api/admin/appointments/" + next + "/handle"), admin, "{\"status\":\"COMPLETED\"}")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"));
     }
 
     @Test

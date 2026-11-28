@@ -8,8 +8,8 @@ import cn.edu.usedcar.common.ApiException;
 import cn.edu.usedcar.common.PageResult;
 import cn.edu.usedcar.entity.VehicleEntity;
 import cn.edu.usedcar.mapper.VehicleMapper;
+import cn.edu.usedcar.model.BusinessTime; // 统一公开查询和代销上架的时间基准。
 import cn.edu.usedcar.model.ReviewDecision;
-import cn.edu.usedcar.model.SaleMode;
 import cn.edu.usedcar.model.VehicleDraft;
 import cn.edu.usedcar.model.VehicleFilter;
 import cn.edu.usedcar.model.VehicleRecord;
@@ -34,16 +34,18 @@ public class VehicleService {
     private final NotificationService notifications;
     private final AttachmentService attachments;
     private final ReportService reports;
+    private final ConsignmentService consignments; // 校验代销上架资格和销售方式修改。
 
     public VehicleService(VehicleMapper vehicles, DictionaryService dictionaries,
                           AuditLogService audit, NotificationService notifications, AttachmentService attachments,
-                          ReportService reports) {
+                          ReportService reports, ConsignmentService consignments) { // 注入统一委托规则。
         this.vehicles = vehicles;
         this.dictionaries = dictionaries;
         this.audit = audit;
         this.notifications = notifications;
         this.attachments = attachments;
         this.reports = reports;
+        this.consignments = consignments; // 复用代销资格与交易状态判断。
     }
 
     // MyBatis-Plus 分页先查总数再查记录，两次读取需要使用同一快照。
@@ -57,7 +59,7 @@ public class VehicleService {
     }
 
     public VehicleRecord publicDetail(long id) {
-        return requiredView(vehicles.selectView(id, VehicleStatus.LISTED, null, false));
+        return requiredView(vehicles.selectView(id, VehicleStatus.LISTED, null, false, BusinessTime.now())); // 查询市场详情时排除已失效的代销车。
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -66,7 +68,7 @@ public class VehicleService {
     }
 
     public VehicleRecord myDetail(long id, long ownerId) {
-        return requiredView(vehicles.selectView(id, null, ownerId, true));
+        return requiredView(vehicles.selectView(id, null, ownerId, true, BusinessTime.now())); // 卖家详情按当前时间显示实际销售状态。
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -92,9 +94,12 @@ public class VehicleService {
     public VehicleRecord resubmit(long id, long ownerId, VehicleSubmission submission) {
         var draft = submission.vehicle();
         var vehicle = lockOwnedVehicle(id, ownerId);
-        if (vehicle.getStatus() != VehicleStatus.REJECTED && vehicle.getStatus() != VehicleStatus.OFFLINE) {
+        var now = BusinessTime.now(); // 以取得车辆锁后的时刻判断是否自然下架。
+        boolean expiredListing = vehicle.getStatus() == VehicleStatus.LISTED && !consignments.isEligible(vehicle, now); // 到期隐藏的车辆允许整理后重提。
+        if (vehicle.getStatus() != VehicleStatus.REJECTED && vehicle.getStatus() != VehicleStatus.OFFLINE && !expiredListing) {
             throw conflict("VEHICLE_STATE_CONFLICT", "仅已退回或已下架的车源可以修改并重新提交。");
         }
+        consignments.requireModeChangeAllowed(vehicle, draft.saleMode(), now); // 未结束的代销委托仍绑定当前销售方式。
         validateDraft(draft);
         applyDraft(vehicle, draft);
         vehicle.setStatus(VehicleStatus.PENDING);
@@ -118,7 +123,8 @@ public class VehicleService {
             throw conflict("VEHICLE_STATE_CONFLICT", "仅待审核车源可以审核，请刷新列表。");
         }
         // 审计编号在每次提交时递增，即使车源重新回到待审，旧审核请求也不能生效。
-        if (requiredView(vehicles.selectView(id, null, null, true)).revision() != revision) {
+        var now = BusinessTime.now(); // 统一比较审核和上架时刻。
+        if (requiredView(vehicles.selectView(id, null, null, true, now)).revision() != revision) { // 查询当前提交版本。
             throw conflict("STALE_REVIEW", "车源已重新提交，请刷新后重新审核。");
         }
         String reason = note == null ? "" : note.strip();
@@ -127,22 +133,20 @@ public class VehicleService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "退回时必须填写原因。");
         }
         if (approve) {
-            if (vehicle.getSaleMode() == SaleMode.CONSIGN) {
-                throw conflict("CONSIGNMENT_REQUIRED", "代销车源需完成委托流程后才能上架。");
-            }
+            consignments.requireActive(vehicle, now); // 代销车需要已审核且处于有效期的本车委托。
             dictionaries.requireActiveEntries(vehicle.getBrandId(), vehicle.getCityId());
-            vehicle.setListedAt(LocalDateTime.now(BUSINESS_ZONE));
+            vehicle.setListedAt(now); // 记录实际通过审核的业务时间。
         }
         vehicle.setStatus(approve ? VehicleStatus.LISTED : VehicleStatus.REJECTED);
         vehicle.setReviewerId(reviewerId);
-        vehicle.setReviewedAt(LocalDateTime.now(BUSINESS_ZONE));
+        vehicle.setReviewedAt(now); // 审核结果与上架资格使用相同的时刻。
         vehicle.setReviewNote(reason.isEmpty() ? null : reason);
         vehicles.updateById(vehicle);
         audit.record(reviewerId, approve ? "APPROVE_VEHICLE" : "REJECT_VEHICLE", "VEHICLE", id,
                 reason.isEmpty() ? "审核通过并上架" : reason);
         notifications.record(vehicle.getOwnerId(), id, "vehicle-review:" + id + ":" + revision, "VEHICLE", id,
                 approve ? "车源审核通过，已上架。" : "车源审核已退回，请在我的车源中查看原因。");
-        return requiredView(vehicles.selectView(id, null, null, true));
+        return requiredView(vehicles.selectView(id, null, null, true, now)); // 返回当前时刻的更新结果。
     }
 
     @Transactional
@@ -162,7 +166,8 @@ public class VehicleService {
         if (page < 1 || pageSize < 1 || pageSize > 100) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "页码从 1 开始，每页最多 100 条。");
         }
-        var result = vehicles.selectVehiclePage(new Page<>(page, pageSize), filter, status, ownerId, managed);
+        var result = vehicles.selectVehiclePage(new Page<>(page, pageSize), filter, status, ownerId, managed,
+                BusinessTime.now()); // 分页计数与记录使用同一个代销判断时刻。
         return new PageResult<>(result.getRecords(), result.getTotal(), page, pageSize);
     }
 

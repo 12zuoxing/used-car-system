@@ -111,9 +111,17 @@ H2 演示模式默认开放 [Swagger UI](http://127.0.0.1:8080/swagger-ui.html) 
 
 **文件**　后端 controller/ConsignmentController.java、service/ConsignmentService.java、controller/AppointmentController.java、service/AppointmentService.java。前端 modules/consignments 下的 ConsignmentPage.vue、ConsignmentReviewPage.vue，以及 modules/appointments 下的 MyAppointmentsPage.vue、AppointmentQueuePage.vue。
 
-- [ ] **后端**　提供 POST /api/vehicles/{id}/consignments、POST /api/admin/consignments/{id}/review、POST /api/consignments/{id}/withdraw。代销上架和下单检查委托状态、有效期和车辆归属。提供 POST /api/vehicles/{id}/appointments、GET /api/appointments，以及预约经办和取消接口。
-- [ ] **前端**　卖家填写委托期限、费用和约定，买家从详情页提交看车时间。工作人员审核委托、处理预约，用户查看进度。
-- [ ] **验收**　验证代销需有效委托才能交易，涵盖到期、重复生效、在办订单撤回、无效预约时间及预约自己的车辆。
+- [x] **后端**　提供委托提交、历史查询、审核和撤回接口。代销上架和下单资格校验统一检查委托状态、有效期与车辆归属。提供预约提交、个人与后台分页、买家取消、后台经办接口。两个流程复用已有数据表、会话角色、审计和通知。
+- [x] **前端**　卖家在车源详情进入委托表单，填写期限、费用和约定。买家在公开详情提交看车时间，在个人中心查看进度。工作人员通过管理端的「代销委托」「看车预约」处理记录。
+- [x] **验收**　Java 17 上 H2 和 MySQL 8.0.46 各通过 19 项后端测试，覆盖委托未生效与到期、重复提交与审核、在办订单撤回、预约权限和时间、经办状态流转。前端 4 项测试和生产构建通过。Chrome 验证委托提交、审核上架、预约提交、确认、取消、窄屏布局及 Swagger 接口文档。
+
+### 本地验收代销和预约流程
+
+1. 以卖家身份发布代销车源，从 **我的车源 → 详情 → 办理代销委托** 填写期限、费用和约定。
+2. 工作人员从 **管理端 → 代销委托** 审核。委托到达生效时间后，再从 **车源审核** 通过并上架。撤回有效委托会同步下架，委托到期会立即从公开市场隐藏该车。换新委托时重新提交车源审核。
+3. 买家从在售车源详情提交预约，工作人员从 **管理端 → 看车预约** 确认并可填写到访说明。买家从 **个人中心 → 我的预约** 查看并可在到访前取消。已确认且到访时间已到的预约由工作人员登记完成。
+
+委托和预约统一使用北京时间。每辆车可保留一份待审核或未到期的委托，代销看车时间须在有效期内。同一买家对同一车辆可保留一份未到访的待处理或已确认预约。模块 5 的下单服务可在订单事务内调用 `ConsignmentService.requireForOrder`，绑定通过资格校验的委托编号。
 
 ## 模块 5 订单与交易状态
 
