@@ -19,6 +19,7 @@ defineEmits(['update:status']) // 变更筛选时由调用页面重新加载第�
   <div class="booking-table-section">
     <!-- 显示可选的状态筛选和统一刷新入口。 -->
     <div class="vehicle-toolbar">
+      <slot name="filters" /><!-- 在同一工具栏接入买入或卖出等额外筛选。 -->
       <label v-if="statuses">
         状态
         <!-- 选择不同状态时由父页面更新查询并回到第一页。 -->

@@ -5,6 +5,7 @@ import cn.edu.usedcar.entity.ConsignmentEntity; // 关联委托表实体。
 import com.baomidou.mybatisplus.core.mapper.BaseMapper; // 提供单表插入、更新和分页查询。
 import org.apache.ibatis.annotations.Param; // 显式命名 SQL 参数。
 import org.apache.ibatis.annotations.Select; // 声明定制查询。
+import org.apache.ibatis.annotations.Update; // 在成交时按车辆和车主约束委托结案。
 
 /** 委托记录及与它关联的交易查询。
  * @author pangzhihao
@@ -27,4 +28,14 @@ public interface ConsignmentMapper extends BaseMapper<ConsignmentEntity> {
     // 撤回前检查有无在办订单，同时覆盖车辆与交易状态暂未同步的情况。
     @Select("SELECT COUNT(*) FROM trade_order WHERE vehicle_id = #{vehicleId} AND status IN ('LOCKED', 'PAID')")
     long countInProgressOrders(@Param("vehicleId") long vehicleId); // 仅计算锁定和已支付的订单。
+
+    // 交易在有效期内创建，成交可以延续至截止日期之后。
+    @Update("""
+            UPDATE consignment SET status = 'COMPLETED'
+            WHERE id = #{id} AND vehicle_id = #{vehicleId} AND owner_id = #{ownerId}
+              AND status IN ('APPROVED', 'EXPIRED')
+            """)
+    int completeForOrder(@Param("id") long id, // 只修改下单时实际保存的委托编号。
+                         @Param("vehicleId") long vehicleId, // 核对这份委托属于成交车辆。
+                         @Param("ownerId") long ownerId); // 同时核对卖家对应的车源归属。
 }

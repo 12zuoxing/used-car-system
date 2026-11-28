@@ -1,0 +1,33 @@
+/* 作者 pangzhihao。订单详情保留金额和状态的清晰层级。 */
+
+/* 将交易金额与车型状态排在卡片顶部。 */
+.order-summary-heading {
+  display: flex; /* 让左侧车型和右侧金额对齐。 */
+  align-items: flex-start; /* 各区域从标题起点对齐。 */
+  justify-content: space-between; /* 让重点信息占据两侧。 */
+  flex-wrap: wrap; /* 窄屏允许金额自然换到下一行。 */
+  gap: 12px; /* 在车型和报价之间保留空间。 */
+  padding-bottom: 12px; /* 把金额与下方明细区分开。 */
+  border-bottom: 1px solid var(--line); /* 延用项目通用的分割线。 */
+}
+
+.order-summary-heading h2 {
+  margin-bottom: 7px; /* 状态标签和车型名称之间留出空隙。 */
+  overflow-wrap: anywhere; /* 防止极长车名撑破卡片。 */
+}
+
+.order-total {
+  display: grid; /* 将金额标题和实际金额分成两行。 */
+  gap: 2px; /* 保持报价标签靠近金额。 */
+  color: var(--muted); /* 使用统一的辅助说明颜色。 */
+}
+
+.order-total strong {
+  color: var(--blue); /* 用主色突出订单金额。 */
+  font-size: clamp(22px, 5vw, 32px); /* 根据屏幕调整标题大小。 */
+  font-variant-numeric: tabular-nums; /* 保持数字与小数位对齐。 */
+}
+
+.order-summary .vehicle-facts {
+  margin: 0; /* 与订单卡片的网格间距统一。 */
+}

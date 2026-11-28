@@ -229,10 +229,10 @@ abstract class TradeOrderWorkflowTests {
     }
 
     private TestUser user() throws Exception {
-        String username = "order_" + token().substring(0, 12); // 为每个参与人生成独立账号。
+        String username = "order_" + token().replace("-", "").substring(0, 12); // 使用登录接口允许的字符生成独立账号。
         var data = json.createObjectNode().put("username", username).put("password", PASSWORD).put("displayName", username); // 构造普通账号注册数据。
-        submit(post("/api/auth/register"), null, data.toString()).andExpect(status().isCreated()); // 经真实认证接口登记。
-        return new TestUser(login(username)); // 生成带有效认证的会话。
+        long userId = id(submit(post("/api/auth/register"), null, data.toString()).andExpect(status().isCreated())); // 经真实认证接口登记并取得用户编号。
+        return new TestUser(userId, login(username)); // 生成带有效认证的会话。
     }
 
     private MockHttpSession login(String username) throws Exception {
@@ -268,6 +268,6 @@ abstract class TradeOrderWorkflowTests {
         return UUID.randomUUID().toString(); // 为不同请求和测试数据生成唯一标识。
     }
 
-    private record TestUser(MockHttpSession session) { } // 保存买卖双方的登录会话。
+    private record TestUser(long id, MockHttpSession session) { } // 保存买卖双方的编号和登录会话。
     private record TradeVehicle(long id, Long consignmentId) { } // 保存测试车源和可选代销委托编号。
 }

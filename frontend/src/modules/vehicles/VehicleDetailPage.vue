@@ -6,6 +6,8 @@ import Message from 'primevue/message'
 import Tag from 'primevue/tag'
 import { vehicleApi } from '../../api/vehicles.js'
 import AppointmentForm from '../appointments/AppointmentForm.vue' // 公共详情可发起看车预约。
+import { auth } from '../auth/session.js' // 已登录用户可在车源不可售时检查订单状态。
+import BuyVehiclePanel from '../orders/BuyVehiclePanel.vue' // 在公开车源加载成功时展示购买入口。
 import VehicleMediaPanel from './VehicleMediaPanel.vue'
 import { canEdit, formatMileage, formatPrice, fuels, saleModes, statuses, transmissions, vehicleTitle } from './vehicleLabels.js'
 
@@ -32,7 +34,11 @@ watch(() => [route.params.id, props.managed], load, { immediate: true })
 <template>
   <main class="public-width vehicle-page">
     <RouterLink class="vehicle-back" :to="{ name: managed ? 'my-vehicles' : 'vehicle-market' }">← {{ managed ? '我的车源' : '返回车源市场' }}</RouterLink>
-    <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
+    <template v-if="error">
+      <Message severity="error" :closable="false">{{ error }}</Message>
+      <!-- 下单响应中断后，车源可能因本人下单已经被锁定，可前往个人订单核实。 -->
+      <RouterLink v-if="!managed && auth.state.account" :to="{ name: 'my-orders' }">查看我的订单</RouterLink>
+    </template>
     <p v-else-if="!vehicle" class="vehicle-empty" role="status">正在读取车源…</p>
     <template v-else>
       <section class="vehicle-detail-heading">
@@ -54,6 +60,8 @@ watch(() => [route.params.id, props.managed], load, { immediate: true })
           </dl>
         </section>
         <section class="vehicle-panel"><h2>车辆描述</h2><p class="vehicle-description">{{ vehicle.description }}</p></section>
+        <!-- 购买操作只在公开车源详情出现，切换车辆时重建本次下单状态。 -->
+        <BuyVehiclePanel v-if="!managed" :key="'buy-' + vehicle.id" :vehicle="vehicle" />
         <!-- 市场详情只展示仍在售的车辆，预约表单再按会话显示登录或提交入口。 -->
         <AppointmentForm v-if="!managed" :key="'appointment-' + vehicle.id" :vehicle-id="vehicle.id" />
         <!-- 卖家从自己的代销车详情进入委托表单和历史。 -->

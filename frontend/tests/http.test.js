@@ -32,12 +32,12 @@ test('a stale CSRF token is refreshed once before repeating a rejected write', a
   const writes = []
   const client = createHttpClient(async (url, { headers }) => {
     if (url.endsWith('/csrf')) return json({ headerName: 'X-CSRF-TOKEN', token: String(++tokens) })
-    writes.push(headers.get('X-CSRF-TOKEN'))
+    writes.push([headers.get('X-CSRF-TOKEN'), headers.get('Idempotency-Key')]) // 同时检查两次请求的认证和幂等头。
     if (writes.length === 1) return json({ code: 'CSRF_INVALID' }, 403)
     return new Response(null, { status: 204 })
   })
-  await client.request('/auth/logout', { method: 'POST' })
-  assert.deepEqual(writes, ['1', '2'])
+  await client.request('/orders', { method: 'POST', body: { vehicleId: 1 }, headers: { 'Idempotency-Key': 'same-order' } }) // 模拟下单过程中 CSRF 令牌过期。
+  assert.deepEqual(writes, [['1', 'same-order'], ['2', 'same-order']]) // 令牌刷新后请求标识不变。
 })
 
 test('a business permission denial is reported without repeating the action', async () => {

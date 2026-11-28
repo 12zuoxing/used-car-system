@@ -23,6 +23,9 @@ export const router = createRouter({
     { path: '/account/vehicles/:id(\\d+)/consignments', name: 'my-consignments', component: () => import('../modules/consignments/ConsignmentPage.vue'), meta: { requiresAuth: true } },
     // 个人中心的预约列表只展示当前会话的买家记录。
     { path: '/account/appointments', name: 'my-appointments', component: () => import('../modules/appointments/MyAppointmentsPage.vue'), meta: { requiresAuth: true } },
+    // 个人交易列表与详情都要求登录，具体订单归属由服务端核对。
+    { path: '/account/orders', name: 'my-orders', component: () => import('../modules/orders/MyOrdersPage.vue'), meta: { requiresAuth: true } },
+    { path: '/account/orders/:id(\\d+)', name: 'my-order-detail', component: () => import('../modules/orders/OrderDetailPage.vue'), meta: { requiresAuth: true } },
     {
       path: '/admin',
       component: () => import('../modules/admin/AdminLayout.vue'),
@@ -35,6 +38,9 @@ export const router = createRouter({
         // 继承管理端的角色检查，再延迟加载委托和预约队列。
         { path: 'consignments', name: 'consignment-review', component: () => import('../modules/consignments/ConsignmentReviewPage.vue') },
         { path: 'appointments', name: 'appointment-queue', component: () => import('../modules/appointments/AppointmentQueuePage.vue') },
+        // 后台订单路由继承管理端权限，详情切换到工作人员的动作和数据。
+        { path: 'orders', name: 'order-queue', component: () => import('../modules/orders/OrderQueuePage.vue') },
+        { path: 'orders/:id(\\d+)', name: 'admin-order-detail', component: () => import('../modules/orders/OrderDetailPage.vue'), props: { managed: true } },
         { path: 'dictionaries', name: 'admin-dictionaries', component: () => import('../modules/admin/DictionaryPage.vue'), meta: { administrator: true } },
       ],
     },

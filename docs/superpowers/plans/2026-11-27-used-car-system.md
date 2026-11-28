@@ -127,9 +127,17 @@ H2 演示模式默认开放 [Swagger UI](http://127.0.0.1:8080/swagger-ui.html) 
 
 **文件**　后端 controller/TradeOrderController.java、service/TradeOrderService.java、mapper/TradeOrderMapper.java，测试 controller/TradeOrderMySqlIT.java。前端 modules/orders 下的 MyOrdersPage.vue、OrderDetailPage.vue、OrderQueuePage.vue。
 
-- [ ] **后端**　提供 POST /api/orders、GET /api/orders、GET /api/orders/{id}、POST /api/orders/{id}/cancel、POST /api/orders/{id}/pay、POST /api/admin/orders/{id}/complete。下单携带 Idempotency-Key，服务读取当前报价。事务内竞争车辆状态、写订单和锁、保存通知。取消和成交按车辆号与订单号核对锁归属。
-- [ ] **前端**　详情页提供下单，重试沿用本次提交的请求标识。个人中心展示买入和卖出订单、模拟支付和取消。后台提供成交确认入口。
-- [ ] **验收**　跑完直销和代销。用 20 个请求争抢同一辆车，验证最多一笔有效锁及订单。覆盖幂等重试、旧单误解锁、未支付成交和非交易参与者访问。用 **mvn "-Dtest=TradeOrderMySqlIT" test** 单独运行 MySQL 集成测试。
+- [x] **后端**　提供个人订单创建、分页、详情、取消和模拟支付接口，以及后台分页、详情和过户确认接口。使用 Idempotency-Key 幂等下单并保存服务端报价。订单、车源、车辆锁、审计和通知一起提交。取消、支付及成交均核对车辆锁归属。
+- [x] **前端**　车源详情提供下单确认，失败重试沿用同一次请求的标识。个人中心展示买入和卖出订单，可模拟支付或取消。后台可筛选订单并确认成交。
+- [x] **验收**　H2 全量通过 24 项后端测试，MySQL 8.0.46 通过 5 项订单专项测试。20 个并发下单请求产生一笔订单和一条车辆锁。前端 5 项测试和生产构建通过，Chrome 实测直销下单与成交、代销取消与恢复在售、响应丢失后的幂等重试及窄屏布局。
+
+### 本地验收下单与成交
+
+1. 以普通用户登录，从在售车源详情选择 **立即下单 → 确认下单**。在 **个人中心 → 我的订单** 查看买入记录和服务端保存的报价。
+2. 买家可在详情点击 **模拟支付**。工作人员从 **管理端 → 交易订单 → 办理过户** 核对后确认过户。卖家可在 **我的订单 → 卖出订单** 查看最后结果。
+3. 支付前买卖双方均可取消。取消后车源若仍具有上架资格，会恢复在售。代销委托到期时，已经下单的交易可以继续办理，取消后车辆转为下架。
+
+运行专用 MySQL 订单测试时，先将 `ORDER_TEST_MYSQL_URL`、`ORDER_TEST_MYSQL_USER`、`ORDER_TEST_MYSQL_PASSWORD` 指向独立测试库，再在后端目录执行 `mvn "-Dtest=TradeOrderMySqlIT" test`。测试会在该库初始化表结构并写入测试数据。
 
 ## 模块 6 贷款登记
 

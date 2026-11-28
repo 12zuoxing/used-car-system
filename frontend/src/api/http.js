@@ -44,8 +44,9 @@ export function createHttpClient(fetchRequest = globalThis.fetch.bind(globalThis
     return csrfRequest
   }
 
-  async function request(path, { method = 'GET', body } = {}, retryCsrf = true) {
-    const headers = new Headers({ Accept: 'application/json' })
+  async function request(path, { method = 'GET', body, headers: requestHeaders } = {}, retryCsrf = true) {
+    const headers = new Headers(requestHeaders) // 复制调用方提供的幂等标识等业务请求头。
+    headers.set('Accept', 'application/json') // 统一接收后端的 JSON 响应。
     const writes = !['GET', 'HEAD', 'OPTIONS'].includes(method)
     const pending = writes ? getCsrfToken() : undefined
     if (pending) {
@@ -69,7 +70,7 @@ export function createHttpClient(fetchRequest = globalThis.fetch.bind(globalThis
       // 普通 403、网络失败和业务冲突不能自动重放。
       if (retryCsrf && writes && error.code === 'CSRF_INVALID') {
         if (csrfRequest === pending) clearCsrfToken()
-        return request(path, { method, body }, false)
+        return request(path, { method, body, headers: requestHeaders }, false) // 刷新令牌时继续使用本次请求原有的业务头。
       }
       throw error
     }

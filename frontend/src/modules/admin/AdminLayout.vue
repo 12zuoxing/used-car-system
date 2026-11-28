@@ -15,6 +15,8 @@ import { auth } from '../auth/session.js'
           <!-- 业务队列继承管理布局的工作人员权限。 -->
           <RouterLink :to="{ name: 'consignment-review' }">代销委托</RouterLink>
           <RouterLink :to="{ name: 'appointment-queue' }">看车预约</RouterLink>
+          <!-- 已模拟支付的交易从订单队列办理过户。 -->
+          <RouterLink :to="{ name: 'order-queue' }">交易订单</RouterLink>
           <RouterLink v-if="auth.isAdministrator()" :to="{ name: 'admin-dictionaries' }">基础字典</RouterLink>
           <RouterLink v-if="auth.isAdministrator()" :to="{ name: 'admin-users' }">账号管理</RouterLink>
           <RouterLink :to="{ name: 'account' }">返回个人中心</RouterLink>

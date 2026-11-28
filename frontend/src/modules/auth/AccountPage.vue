@@ -20,6 +20,8 @@ import { auth, roleLabels } from './session.js'
         <RouterLink class="solid-link" :to="{ name: 'my-vehicles' }">我的车源</RouterLink>
         <!-- 买家进入个人预约页查看确认进度与处理说明。 -->
         <RouterLink :to="{ name: 'my-appointments' }">我的预约</RouterLink>
+        <!-- 交易双方从个人中心查看自己的买入和卖出订单。 -->
+        <RouterLink :to="{ name: 'my-orders' }">我的订单</RouterLink>
         <RouterLink v-if="auth.isManager()" :to="{ name: 'admin' }">打开管理端</RouterLink>
       </div>
     </section>

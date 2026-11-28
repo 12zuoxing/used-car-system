@@ -147,10 +147,20 @@ public class ConsignmentService {
     @Transactional(propagation = Propagation.MANDATORY) // 调用方的下单事务须保持车辆锁直到订单写完。
     public Long requireForOrder(long vehicleId) {
         var vehicle = access.lock(vehicleId); // 获取与撤回和审核使用的同一车辆行锁。
+        return requireForOrder(vehicle, BusinessTime.now()); // 提供给需要自行获取车辆锁的入口。
+    }
+
+    Long requireForOrder(VehicleEntity vehicle, LocalDateTime now) {
         if (vehicle.getStatus() != VehicleStatus.LISTED) {
             throw BookingSupport.conflict("VEHICLE_STATE_CONFLICT", "仅在售车辆可以下单。"); // 锁定和未上架车辆均不能下单。
         }
-        return requireActive(vehicle, BusinessTime.now()); // 直销返回空，代销返回必须写入订单的委托编号。
+        return requireActive(vehicle, now); // 利用调用方已有的车源写锁与同一业务时刻判断委托。
+    }
+
+    void completeForOrder(VehicleEntity vehicle, Long consignmentId) {
+        if (consignmentId == null || consignments.completeForOrder(consignmentId, vehicle.getId(), vehicle.getOwnerId()) != 1) {
+            throw BookingSupport.conflict("CONSIGNMENT_STATE_CONFLICT", "订单对应的代销委托状态有变化，无法确认成交。"); // 拒绝结案找不到或归属不符的委托。
+        }
     }
 
     boolean isEligible(VehicleEntity vehicle, LocalDateTime now) {
