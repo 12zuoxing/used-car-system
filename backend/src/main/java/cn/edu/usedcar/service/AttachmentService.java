@@ -12,6 +12,7 @@ import cn.edu.usedcar.mapper.AttachmentMapper;
 import cn.edu.usedcar.mapper.ReportMapper;
 import cn.edu.usedcar.model.AttachmentInfo;
 import cn.edu.usedcar.model.AttachmentKind;
+import cn.edu.usedcar.model.BusinessTime; // 下载使用与车源市场相同的业务时间。
 import cn.edu.usedcar.model.ReportStatus;
 import cn.edu.usedcar.model.SessionAccount;
 import cn.edu.usedcar.model.UploadFile;
@@ -58,7 +59,8 @@ public class AttachmentService {
             }
         } else {
             var status = vehicle.getStatus();
-            if (status != VehicleStatus.PENDING && status != VehicleStatus.REJECTED && status != VehicleStatus.OFFLINE) {
+            if (status == VehicleStatus.LOCKED || status == VehicleStatus.SOLD
+                    || (status == VehicleStatus.LISTED && access.isPublic(vehicleId))) { // 委托自然到期即视同下架，可补拍照片后重提。
                 throw new ApiException(HttpStatus.CONFLICT, "VEHICLE_STATE_CONFLICT", "在售车源需下架后再补充照片。");
             }
         }
@@ -89,7 +91,8 @@ public class AttachmentService {
     }
 
     public Download download(long id, SessionAccount actor) {
-        var attachment = attachments.selectReadable(id, VehicleMediaAccess.viewerId(actor), VehicleMediaAccess.manager(actor));
+        var attachment = attachments.selectReadable(id, VehicleMediaAccess.viewerId(actor), VehicleMediaAccess.manager(actor),
+                BusinessTime.now()); // 让数据库同时判断报告和代销车的公开有效性。
         if (attachment == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "ATTACHMENT_NOT_FOUND", "附件不存在或不可查看。");
         }

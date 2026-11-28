@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 作者 pangzhihao。下载时在同一查询内判断附件所属车辆和报告的可见范围。 -->
+<mapper namespace="cn.edu.usedcar.mapper.AttachmentMapper">
+    <select id="selectReadable" resultType="cn.edu.usedcar.entity.AttachmentEntity">
+        SELECT a.* <!-- 只返回通过权限校验的附件记录。 -->
+        FROM attachment a <!-- 以附件主键为查询入口。 -->
+        JOIN vehicle v ON v.id = a.vehicle_id <!-- 读取车源状态及发布人。 -->
+        LEFT JOIN vehicle_report r ON r.id = a.report_id AND r.vehicle_id = a.vehicle_id <!-- 照片没有报告，报告附件则须绑定同一车辆。 -->
+        WHERE a.id = #{id} <!-- 精确查询指定编号。 -->
+          AND (#{manager} = TRUE OR v.owner_id = #{viewerId,jdbcType=BIGINT} <!-- 管理人员和发布人允许查看私有资料。 -->
+            OR (v.status = 'LISTED' AND <include refid="cn.edu.usedcar.mapper.VehicleMapper.eligibleSaleMode"/> <!-- 其他用户只读取在售且当前符合条件的车源。 -->
+                AND (a.kind = 'PHOTO' OR r.status = 'APPROVED'))) <!-- 报告附件还必须审核通过。 -->
+    </select>
+</mapper>

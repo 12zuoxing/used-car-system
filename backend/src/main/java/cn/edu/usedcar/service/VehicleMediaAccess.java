@@ -3,6 +3,7 @@ package cn.edu.usedcar.service;
 import cn.edu.usedcar.common.ApiException;
 import cn.edu.usedcar.entity.VehicleEntity;
 import cn.edu.usedcar.mapper.VehicleMapper;
+import cn.edu.usedcar.model.BusinessTime; // 按代销与预约统一的业务时刻判断公开可见性。
 import cn.edu.usedcar.model.Role;
 import cn.edu.usedcar.model.SessionAccount;
 import cn.edu.usedcar.model.VehicleStatus;
@@ -35,10 +36,14 @@ class VehicleMediaAccess {
 
     VehicleEntity readable(long id, SessionAccount actor) {
         var vehicle = vehicles.selectById(id);
-        if (vehicle == null || (vehicle.getStatus() != VehicleStatus.LISTED && !privateView(vehicle, actor))) {
+        if (vehicle == null || (!privateView(vehicle, actor) && !isPublic(id))) { // 公开媒体跟随车源及委托状态。
             throw missing();
         }
         return vehicle;
+    }
+
+    boolean isPublic(long id) {
+        return vehicles.isPublic(id, BusinessTime.now()); // 与市场详情共享公开车源的资格判断。
     }
 
     VehicleEntity lock(long id) {
