@@ -26,6 +26,9 @@ export const router = createRouter({
     // 个人交易列表与详情都要求登录，具体订单归属由服务端核对。
     { path: '/account/orders', name: 'my-orders', component: () => import('../modules/orders/MyOrdersPage.vue'), meta: { requiresAuth: true } },
     { path: '/account/orders/:id(\\d+)', name: 'my-order-detail', component: () => import('../modules/orders/OrderDetailPage.vue'), meta: { requiresAuth: true } },
+    // 买家可从订单打开其贷款登记，个人中心提供申请列表。
+    { path: '/account/orders/:id(\\d+)/loan', name: 'loan-application', component: () => import('../modules/loans/LoanApplicationPage.vue'), meta: { requiresAuth: true } },
+    { path: '/account/loans', name: 'my-loans', component: () => import('../modules/loans/MyLoansPage.vue'), meta: { requiresAuth: true } },
     {
       path: '/admin',
       component: () => import('../modules/admin/AdminLayout.vue'),
@@ -41,6 +44,9 @@ export const router = createRouter({
         // 后台订单路由继承管理端权限，详情切换到工作人员的动作和数据。
         { path: 'orders', name: 'order-queue', component: () => import('../modules/orders/OrderQueuePage.vue') },
         { path: 'orders/:id(\\d+)', name: 'admin-order-detail', component: () => import('../modules/orders/OrderDetailPage.vue'), props: { managed: true } },
+        // 贷款经办列表和详情继承管理端的工作人员角色规则。
+        { path: 'loans', name: 'loan-queue', component: () => import('../modules/loans/LoanQueuePage.vue') },
+        { path: 'loans/:id(\\d+)', name: 'admin-loan-detail', component: () => import('../modules/loans/LoanReviewPage.vue') },
         { path: 'dictionaries', name: 'admin-dictionaries', component: () => import('../modules/admin/DictionaryPage.vue'), meta: { administrator: true } },
       ],
     },

@@ -22,6 +22,8 @@ import { auth, roleLabels } from './session.js'
         <RouterLink :to="{ name: 'my-appointments' }">我的预约</RouterLink>
         <!-- 交易双方从个人中心查看自己的买入和卖出订单。 -->
         <RouterLink :to="{ name: 'my-orders' }">我的订单</RouterLink>
+        <!-- 申请人可在这里查看待补充资料或经办结果。 -->
+        <RouterLink :to="{ name: 'my-loans' }">我的贷款</RouterLink>
         <RouterLink v-if="auth.isManager()" :to="{ name: 'admin' }">打开管理端</RouterLink>
       </div>
     </section>

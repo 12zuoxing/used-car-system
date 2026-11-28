@@ -126,10 +126,12 @@ watch(() => [route.params.id, props.managed], load, { immediate: true }) // 路�
       </dl>
       <p v-if="order.handlingNote" class="vehicle-description">过户说明 {{ order.handlingNote }}</p>
       <!-- 操作按钮随视角和状态变化，最终由服务端执行业务条件校验。 -->
-      <div v-if="(!managed && pending) || (managed && order.status === 'PAID')" class="vehicle-actions">
+      <div v-if="(!managed && (pending || order.side === 'BUY')) || (managed && order.status === 'PAID')" class="vehicle-actions">
         <Button v-if="!managed && pending && order.side === 'BUY'" label="模拟支付" @click="prepare('pay')" />
         <Button v-if="!managed && pending" label="取消订单" severity="danger" variant="outlined" @click="prepare('cancel')" />
         <Button v-if="managed && order.status === 'PAID'" label="确认过户" @click="prepare('complete')" />
+        <!-- 只给订单买家显示登记或查看既有贷款资料的入口。 -->
+        <RouterLink v-if="!managed && order.side === 'BUY'" :to="{ name: 'loan-application', params: { id: order.id } }">贷款登记</RouterLink>
       </div>
     </section>
     <!-- 对话框将模拟支付、取消和过户确认都变成明确的用户操作。 -->

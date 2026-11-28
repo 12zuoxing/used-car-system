@@ -44,11 +44,13 @@ public class TradeOrderService {
     private final BookingSupport support; // 复用列表分页、查名及错误处理。
     private final AuditLogService audit; // 为关键交易操作写入责任记录。
     private final NotificationService notifications; // 在同一事务登记买卖双方应收到的状态通知。
+    private final LoanService loans; // 订单取消时同步关闭尚未结案的贷款登记。
     private final TransactionTemplate createTransaction; // 幂等键竞争失败后允许在事务外读取赢家订单。
 
     public TradeOrderService(TradeOrderMapper orders, VehicleLockMapper locks, VehicleMapper vehicles,
                              VehicleMediaAccess access, ConsignmentService consignments, BookingSupport support,
-                             AuditLogService audit, NotificationService notifications, PlatformTransactionManager transactions) {
+                             AuditLogService audit, NotificationService notifications, PlatformTransactionManager transactions,
+                             LoanService loans) {
         this.orders = orders; // 注入订单持久层。
         this.locks = locks; // 注入车辆锁持久层。
         this.vehicles = vehicles; // 注入车源持久层。
@@ -57,6 +59,7 @@ public class TradeOrderService {
         this.support = support; // 注入通用分页展示支持。
         this.audit = audit; // 注入操作记录服务。
         this.notifications = notifications; // 注入通知记录服务。
+        this.loans = loans; // 注入关联登记处理服务。
         this.createTransaction = new TransactionTemplate(transactions); // 明确由本类管理下单事务的开始和结束。
         this.createTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW); // 让失败的预订完整回滚后再做幂等恢复。
         this.createTransaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED); // 拿到车源锁后读取其他请求已经提交的订单。
@@ -141,6 +144,7 @@ public class TradeOrderService {
                 relist ? vehicle.getListedAt() : null); // 保留仍有效的原上架时间，失效车源重置为下架。
         order.setStatus(TradeOrderStatus.CANCELLED); // 保留已取消的订单历史。
         orders.updateById(order); // 持久化订单状态。
+        loans.closeForCancelledOrder(order, actorId); // 复用车源写锁和取消事务关闭未完成贷款。
         audit.record(actorId, "CANCEL_ORDER", "ORDER", id, "买卖双方在支付前取消订单"); // 区分负责取消的人和系统状态。
         long other = order.getBuyerId() == actorId ? order.getSellerId() : order.getBuyerId(); // 找到取消动作的另一位交易参与人。
         notify(other, order, "cancelled", "本笔待支付订单已取消。"); // 向另一方登记取消消息。

@@ -224,7 +224,7 @@ public class LoanService {
     }
 
     private LoanApplicationEntity required(long id) {
-        var row = loans.selectById(id); // 根据贷款主键读取合同登记资料。
+        var row = loans.selectById(id); // 根据贷款主键读取登记资料。
         if (row == null) throw missing(); // 没有对应记录时返回缺失。
         return row; // 返回当前事务内读到的状态。
     }

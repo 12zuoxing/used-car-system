@@ -127,6 +127,100 @@ abstract class TradeOrderWorkflowTests {
     }
 
     @Test
+    void loanIsPrivateAndValidatesOrderAmountAndTerm() throws Exception {
+        var admin = login("order_admin"); // 用正常业务接口审核测试车源。
+        var seller = user(); // 卖家能够看订单但无权看买家的贷款资料。
+        var buyer = user(); // 只有下单买家才能登记贷款。
+        var other = user(); // 第三方编号用于验证越权响应。
+        var car = listed(admin, seller, "DIRECT"); // 准备独立车源避免测试数据互相影响。
+        long order = id(postOrder(buyer, car.id(), token()).andExpect(status().isCreated())); // 保存实际锁车订单作为登记对象。
+        String path = "/api/orders/" + order + "/loan"; // 确保贷款与路径指向的订单绑定。
+        String input = "{\"amount\":52800.25,\"months\":84,\"note\":\"买家补充说明\"}"; // 使用恰好等于订单金额和期限上限的表单。
+        mvc.perform(get(path).session(buyer.session())).andExpect(status().isNoContent()); // 买家可确认订单还没有贷款申请。
+        submit(post(path), seller.session(), input).andExpect(status().isNotFound()); // 卖家不能替买家提交。
+        submit(post(path), other.session(), input).andExpect(status().isNotFound()); // 其他人不知道订单是否存在。
+        submit(post(path), buyer.session(), "{\"amount\":52800.26,\"months\":12}").andExpect(status().isBadRequest()); // 超过订单金额一分钱也要拒绝。
+        submit(post(path), buyer.session(), "{\"amount\":20000,\"months\":85}").andExpect(status().isBadRequest()); // 拒绝超过 84 期。
+        submit(post(path), buyer.session(), "{\"amount\":20000,\"months\":0}").andExpect(status().isBadRequest()); // 拒绝低于一期。
+        long loan = id(submit(post(path), buyer.session(), input).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("PENDING"))); // 合法表单创建一条待处理的登记。
+        submit(post(path), buyer.session(), input).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LOAN_ALREADY_EXISTS")); // 同订单一份申请。
+        mvc.perform(get(path).session(buyer.session())).andExpect(jsonPath("$.id").value(loan)); // 订单可查到本人的原登记。
+        mvc.perform(get(path).session(seller.session())).andExpect(status().isNotFound()); // 卖家同样无法用订单路径查询。
+        mvc.perform(get("/api/loans/" + loan).session(other.session())).andExpect(status().isNotFound()); // 直接改贷款编号同样失败。
+        mvc.perform(get("/api/admin/loans/" + loan).session(buyer.session())).andExpect(status().isForbidden()); // 买家无权访问管理入口。
+        mvc.perform(get("/api/loans").session(buyer.session())).andExpect(jsonPath("$.total").value(1)); // 买家列表只展示自己的申请。
+        mvc.perform(get("/api/loans").session(seller.session())).andExpect(jsonPath("$.total").value(0)); // 卖家不能通过分页获取申请。
+        assertThat(jdbc.queryForObject("SELECT status FROM trade_order WHERE id = ?", String.class, order))
+                .isEqualTo("LOCKED"); // 贷款登记本身不改变订单的支付状态。
+    }
+
+    @Test
+    void loanSupplementReusesRecordAndRejectsStaleHandling() throws Exception {
+        var admin = login("order_admin"); // 通过管理员授权普通工作人员角色。
+        var staff = user(); // 使用工作人员会话办理贷款资料。
+        submit(put("/api/admin/users/" + staff.id() + "/roles"), admin, "{\"roles\":[\"STAFF\"]}").andExpect(status().isOk()); // 让后台角色与申请人分开。
+        var seller = user(); // 提供申请对应的车辆和交易卖家。
+        var buyer = user(); // 用交易买家的身份提交和修改资料。
+        var car = listed(admin, seller, "DIRECT"); // 沿用正常业务流程上架可交易车源。
+        long order = id(postOrder(buyer, car.id(), token()).andExpect(status().isCreated())); // 生成用于申请贷款的订单记录。
+        String initial = "{\"amount\":23000,\"months\":12,\"note\":\"初次登记\"}"; // 初次登记包含金额、期限和用途说明。
+        var created = read(submit(post("/api/orders/" + order + "/loan"), buyer.session(), initial).andExpect(status().isCreated())); // 保留初次审核版本。
+        long loan = created.get("id").asLong(); // 所有补充和后台处理都复用这个编号。
+        String detail = "/api/loans/" + loan; // 申请人读取及更新申请的路径。
+        String handle = "/api/admin/loans/" + loan + "/status"; // 工作人员改变办理状态的路径。
+        mvc.perform(get("/api/admin/loans/" + loan).session(staff.session())).andExpect(jsonPath("$.note").value("初次登记")); // 授权工作人员能查申请详情。
+        submit(put(detail), buyer.session(), initial).andExpect(status().isConflict()); // 仍在待处理时申请人不能直接覆盖审核资料。
+        submit(post(handle), staff.session(), loanStatus("FINISHED", "提前结束", created)).andExpect(status().isConflict()); // 待处理不可跳过办理直接完成。
+        submit(post(handle), staff.session(), loanStatus("SUPPLEMENT", "  ", created)).andExpect(status().isBadRequest()); // 退回要有实际的补充要求。
+        var supplement = read(submit(post(handle), staff.session(), loanStatus("SUPPLEMENT", "请补充还款安排", created))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.resultNote").value("请补充还款安排"))); // 审核员退回并留下一条说明。
+        var replacement = "{\"amount\":22000,\"months\":1,\"note\":\"已补充说明\"}"; // 在允许范围内更新金额和期限。
+        submit(put(detail), seller.session(), replacement).andExpect(status().isNotFound()); // 只有申请人能补充资料。
+        var resubmitted = read(submit(put(detail).param("revision", supplement.get("revision").asText()), buyer.session(), replacement)
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(loan))
+                .andExpect(jsonPath("$.status").value("PENDING")).andExpect(jsonPath("$.months").value(1))); // 更新原记录并回到待处理。
+        submit(post(handle), staff.session(), loanStatus("PROCESSING", "", created)).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("STALE_LOAN")); // 上一次的审核页面无法处理补充后的数据。
+        var processing = read(submit(post(handle), staff.session(), loanStatus("PROCESSING", "", resubmitted))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PROCESSING"))); // 工作人员可以开始办理。
+        submit(post(handle), staff.session(), loanStatus("FINISHED", "人工登记已完成", processing))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("FINISHED")); // 办理完成时留下一条结果说明。
+        mvc.perform(get("/api/admin/loans").param("status", "FINISHED").session(staff.session()))
+                .andExpect(jsonPath("$.items[?(@.id == " + loan + ")]").isNotEmpty()); // 通过后台筛选可查完成的登记。
+        mvc.perform(get(detail).session(buyer.session())).andExpect(jsonPath("$.resultNote").value("人工登记已完成")); // 申请人能看到最新的办理结论。
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM loan_application WHERE order_id = ?", Long.class, order)).isOne(); // 补充资料未创建第二条记录。
+        submit(post("/api/orders/" + order + "/cancel"), buyer.session(), null).andExpect(status().isOk()); // 办理结果和模拟支付保持独立。
+        mvc.perform(get(detail).session(buyer.session())).andExpect(jsonPath("$.status").value("FINISHED")); // 已完成的登记保留历史结果。
+    }
+
+    @Test
+    void duplicateLoanRequestsAndOrderCancellationKeepStateConsistent() throws Exception {
+        var admin = login("order_admin"); // 建立真实的审核上下文。
+        var seller = user(); // 车主用于测试取消所占用的车辆。
+        var buyer = user(); // 两个并发贷款请求共享同一买家和订单。
+        var car = listed(admin, seller, "DIRECT"); // 准备在售车辆。
+        long order = id(postOrder(buyer, car.id(), token()).andExpect(status().isCreated())); // 建立待支付订单。
+        String path = "/api/orders/" + order + "/loan"; // 同一订单的贷款入口。
+        String form = "{\"amount\":26000,\"months\":36}"; // 不带可选备注的合法申请。
+        var results = race(List.of(withCsrf(post(path), buyer.session(), form), withCsrf(post(path), buyer.session(), form))); // 同时提交两次同订单申请。
+        assertThat(results.stream().map(result -> result.getResponse().getStatus())).containsExactlyInAnyOrder(201, 409); // 并发也只保留一次有效登记。
+        long loan = read(mvc.perform(get(path).session(buyer.session())).andExpect(status().isOk())).get("id").asLong(); // 读取成功保留的申请编号。
+        submit(post("/api/orders/" + order + "/cancel"), seller.session(), null).andExpect(status().isOk()); // 订单取消应在同一事务处理未结贷款。
+        mvc.perform(get("/api/loans/" + loan).session(buyer.session())).andExpect(jsonPath("$.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.resultNote").value("关联订单已取消。")); // 保留买家可见的关闭原因。
+        submit(post(path), buyer.session(), form).andExpect(status().isConflict()); // 已取消订单无法重新登记。
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE subject_type = 'LOAN' AND subject_id = ?", Long.class, loan))
+                .isEqualTo(1L); // 订单取消只登记一次贷款关闭通知。
+    }
+
+    private String loanStatus(String state, String note, JsonNode revision) {
+        return json.createObjectNode().put("status", state).put("resultNote", note)
+                .put("revision", revision.get("revision").asLong()).toString(); // 携带审核员读取到的贷款版本。
+    }
+
+    @Test
     void concurrentRequestsProduceOnlyOneOrderAndOneLock() throws Exception {
         var admin = login("order_admin"); // 使用真实的上架流程准备同一辆车。
         var seller = user(); // 为车源提供独立卖家身份。
