@@ -86,6 +86,9 @@ public class SecurityConfig {
                         // 公开车源仅开放列表和数字编号详情，mine 等路径仍需登录。
                         .requestMatchers(HttpMethod.GET, "/api/dictionaries", "/api/vehicles",
                                 "/api/vehicles/{id:[0-9]+}").permitAll()
+                        // 资料详情由服务根据车辆、报告状态和资料归属判定。
+                        .requestMatchers(HttpMethod.GET, "/api/vehicles/{id:[0-9]+}/attachments",
+                                "/api/vehicles/{id:[0-9]+}/reports", "/api/attachments/{id:[0-9]+}").permitAll()
                         .requestMatchers("/api/admin/users", "/api/admin/users/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/dictionaries", "/api/admin/dictionaries/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "STAFF")

@@ -7,7 +7,9 @@ import DataTable from 'primevue/datatable'
 import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
+import { mediaApi } from '../../api/media.js'
 import { vehicleApi } from '../../api/vehicles.js'
+import VehicleGallery from './VehicleGallery.vue'
 import { formatMileage, formatPrice, fuels, saleModes, statuses, transmissions, vehicleTitle } from './vehicleLabels.js'
 import { useVehiclePage } from './useVehiclePage.js'
 
@@ -19,14 +21,30 @@ const saving = ref(false)
 const notice = ref('')
 const queueWarning = ref('')
 const reviewError = ref('')
+const photos = ref([])
+const readingPhotos = ref(false)
+const photoError = ref('')
+let photoVersion = 0
 const page = useVehiclePage((query) => vehicleApi.queue({ ...query, status: status.value }), 10)
 
-function openReview(vehicle) {
+async function openReview(vehicle) {
+  const version = ++photoVersion
   target.value = vehicle
   note.value = ''
   reviewError.value = ''
   queueWarning.value = ''
+  photos.value = []
+  photoError.value = ''
+  readingPhotos.value = true
   showReview.value = true
+  try {
+    const files = await mediaApi.photos(vehicle.id)
+    if (version === photoVersion) photos.value = files
+  } catch (failure) {
+    if (version === photoVersion) photoError.value = failure.message
+  } finally {
+    if (version === photoVersion) readingPhotos.value = false
+  }
 }
 
 async function review(decision) {
@@ -97,6 +115,9 @@ onMounted(() => page.load())
           <div><dt>经营方式</dt><dd>{{ saleModes[target.saleMode] }}</dd></div>
         </dl>
         <p class="vehicle-description">{{ target.description }}</p>
+        <p v-if="readingPhotos" class="muted-text" role="status">正在读取车源照片…</p>
+        <Message v-else-if="photoError" severity="error" :closable="false">{{ photoError }}</Message>
+        <VehicleGallery v-else :photos="photos" compact />
         <template v-if="target.status === 'PENDING'">
           <label class="vehicle-dialog-label">审核说明<textarea v-model="note" rows="3" maxlength="500" placeholder="退回时必须填写原因" /></label>
           <Message v-if="target.saleMode === 'CONSIGN'" severity="warn" :closable="false">代销车源需完成委托后才能上架。</Message>
@@ -108,7 +129,7 @@ onMounted(() => page.load())
         <Button label="关闭" severity="secondary" variant="outlined" :disabled="saving" @click="showReview = false" />
         <template v-if="target?.status === 'PENDING'">
           <Button label="退回修改" severity="danger" variant="outlined" :disabled="saving" @click="review('REJECT')" />
-          <Button label="通过并上架" :loading="saving" :disabled="target.saleMode === 'CONSIGN'" @click="review('APPROVE')" />
+          <Button label="通过并上架" :loading="saving" :disabled="target.saleMode === 'CONSIGN' || readingPhotos || Boolean(photoError)" @click="review('APPROVE')" />
         </template>
       </template>
     </Dialog>

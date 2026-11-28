@@ -52,14 +52,16 @@ export function createHttpClient(fetchRequest = globalThis.fetch.bind(globalThis
       const { headerName, token } = await pending
       headers.set(headerName, token)
     }
-    if (body !== undefined) headers.set('Content-Type', 'application/json')
+    // 让浏览器为文件表单生成 Content-Type 和 boundary，CSRF 头仍照常附加。
+    const multipart = body instanceof FormData
+    if (body !== undefined && !multipart) headers.set('Content-Type', 'application/json')
 
     try {
       const response = await fetchRequest('/api' + path, {
         method,
         headers,
         credentials: 'same-origin',
-        body: body === undefined ? undefined : JSON.stringify(body),
+        body: body === undefined || multipart ? body : JSON.stringify(body),
       })
       return await readResponse(response)
     } catch (error) {

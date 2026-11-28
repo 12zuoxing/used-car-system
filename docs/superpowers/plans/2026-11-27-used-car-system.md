@@ -95,9 +95,17 @@ H2 演示模式默认开放 [Swagger UI](http://127.0.0.1:8080/swagger-ui.html) 
 
 **文件**　后端 controller/VehicleReportController.java、service/ReportService.java、controller/AttachmentController.java、service/AttachmentService.java。前端 modules/vehicles/VehicleGallery.vue 及 modules/reports 下的 ReportEditor.vue、ReportReviewPage.vue。
 
-- [ ] **后端**　提供 POST /api/vehicles/{id}/reports、GET /api/vehicles/{id}/reports、POST /api/admin/reports/{id}/review、POST /api/vehicles/{id}/attachments、GET /api/attachments/{id}。照片支持 JPEG、PNG 和 WebP，报告附件增加 PDF。检查文件类型、应用配置的大小限制、报告车辆归属和下载权限。
-- [ ] **前端**　发布页接入照片上传和查博士等车况报告的人工登记。详情展示相册、已审核报告的来源、日期、摘要与附件，管理端提供报告审核与退回原因。
-- [ ] **验收**　验证图片上传与显示、超限和错误类型拒绝、待审报告可见范围及跨车辆附件访问拒绝。
+- [x] **后端**　提供照片与报告上传、列表、受控读取，以及后台报告分页和审核接口。照片支持 JPEG、PNG 和 WebP，报告附件增加 PDF。校验文件内容、大小、记录归属和下载权限。发布时一并提交的车辆、照片和报告在同一事务保存。
+- [x] **前端**　发布页可同时上传照片、人工登记查博士等报告及附件。车辆详情展示相册、审核通过的报告和下载入口。卖家可在我的车源补充资料，后台可审核或填写退回原因。
+- [x] **验收**　H2 和 MySQL 8.0.46 各通过 17 项后端测试，覆盖超限和错误类型拒绝、待审资料可见范围、跨车辆附件访问及上传回滚。前端 4 项测试和生产构建通过。Chrome 实测发布上传、相册显示、报告审核、公开下载和窄屏布局。
+
+### 本地验收照片和报告流程
+
+1. 在 **发布车源** 中选择实拍照片，打开 **同时登记车况报告**，填写来源、日期和摘要。可一起选取检测报告 PDF 或图片。
+2. 工作人员在 **管理端 → 车源审核** 查看实拍图并处理车源，在 **管理端 → 车况报告** 查看报告附件并通过或退回。买家可在在售详情下载已通过的报告。
+3. 卖家可从 **我的车源 → 详情** 查看报告审核结果。待审报告可补充附件，已退回报告可重新登记为一条新报告。在售车源须先下架，再补充实拍图并重新提交。
+
+文件默认保存在后端的 **data/uploads**，可通过 **APP_UPLOADS** 自定义目录。默认单文件 5 MB，同一次 multipart 请求 6 MB。上传图片在限制尺寸内进行解码验证，PDF 报告通过受控下载接口提供。
 
 ## 模块 4 代销与看车预约
 

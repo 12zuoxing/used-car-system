@@ -1,6 +1,7 @@
 <!-- @author pangzhihao -->
 <script setup>
 import Tag from 'primevue/tag'
+import { attachmentUrl } from '../../api/media.js'
 import { formatMileage, formatPrice, fuels, saleModes, vehicleTitle } from './vehicleLabels.js'
 
 defineProps({ vehicle: { type: Object, required: true } })
@@ -9,6 +10,8 @@ defineProps({ vehicle: { type: Object, required: true } })
 <template>
   <article class="vehicle-card">
     <RouterLink :to="{ name: 'vehicle-detail', params: { id: vehicle.id } }" class="vehicle-card-link">
+      <img v-if="vehicle.coverPhotoId" class="vehicle-card-photo" :src="attachmentUrl(vehicle.coverPhotoId)"
+        :alt="vehicleTitle(vehicle)" loading="lazy" />
       <div class="vehicle-card-top">
         <span class="vehicle-brand">{{ vehicle.brandName }}</span>
         <Tag :value="saleModes[vehicle.saleMode]" severity="info" />

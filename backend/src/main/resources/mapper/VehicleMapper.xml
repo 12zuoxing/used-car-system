@@ -23,6 +23,7 @@
             <arg column="review_note" javaType="string"/>
             <arg column="reviewed_at" javaType="java.time.LocalDateTime"/>
             <arg column="revision" javaType="java.lang.Long"/>
+            <arg column="cover_photo_id" javaType="java.lang.Long"/>
         </constructor>
     </resultMap>
 
@@ -34,12 +35,14 @@
             <when test="managed">
                 u.display_name AS owner_name, v.review_note, v.reviewed_at,
                 COALESCE((SELECT MAX(a.id) FROM audit_log a
-                  WHERE a.subject_type = 'VEHICLE' AND a.subject_id = v.id AND a.action = 'SUBMIT_VEHICLE'), 0) AS revision
+                  WHERE a.subject_type = 'VEHICLE' AND a.subject_id = v.id
+                    AND a.action IN ('SUBMIT_VEHICLE', 'ADD_VEHICLE_PHOTO')), 0) AS revision
             </when>
             <otherwise>
                 NULL AS owner_name, NULL AS review_note, CAST(NULL AS DATETIME) AS reviewed_at, NULL AS revision
             </otherwise>
         </choose>
+        , (SELECT MIN(p.id) FROM attachment p WHERE p.vehicle_id = v.id AND p.kind = 'PHOTO') AS cover_photo_id
         FROM vehicle v
         JOIN brand b ON b.id = v.brand_id
         JOIN city c ON c.id = v.city_id

@@ -14,6 +14,7 @@ import cn.edu.usedcar.model.VehicleDraft;
 import cn.edu.usedcar.model.VehicleFilter;
 import cn.edu.usedcar.model.VehicleRecord;
 import cn.edu.usedcar.model.VehicleStatus;
+import cn.edu.usedcar.model.VehicleSubmission;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -31,13 +32,18 @@ public class VehicleService {
     private final DictionaryService dictionaries;
     private final AuditLogService audit;
     private final NotificationService notifications;
+    private final AttachmentService attachments;
+    private final ReportService reports;
 
     public VehicleService(VehicleMapper vehicles, DictionaryService dictionaries,
-                          AuditLogService audit, NotificationService notifications) {
+                          AuditLogService audit, NotificationService notifications, AttachmentService attachments,
+                          ReportService reports) {
         this.vehicles = vehicles;
         this.dictionaries = dictionaries;
         this.audit = audit;
         this.notifications = notifications;
+        this.attachments = attachments;
+        this.reports = reports;
     }
 
     // MyBatis-Plus 分页先查总数再查记录，两次读取需要使用同一快照。
@@ -69,7 +75,8 @@ public class VehicleService {
     }
 
     @Transactional
-    public VehicleRecord create(long ownerId, VehicleDraft draft) {
+    public VehicleRecord create(long ownerId, VehicleSubmission submission) {
+        var draft = submission.vehicle();
         validateDraft(draft);
         var vehicle = new VehicleEntity();
         vehicle.setOwnerId(ownerId);
@@ -77,11 +84,13 @@ public class VehicleService {
         vehicle.setStatus(VehicleStatus.PENDING);
         vehicles.insert(vehicle);
         audit.record(ownerId, "SUBMIT_VEHICLE", "VEHICLE", vehicle.getId(), "提交车源审核");
+        saveMedia(vehicle.getId(), ownerId, submission);
         return myDetail(vehicle.getId(), ownerId);
     }
 
     @Transactional
-    public VehicleRecord resubmit(long id, long ownerId, VehicleDraft draft) {
+    public VehicleRecord resubmit(long id, long ownerId, VehicleSubmission submission) {
+        var draft = submission.vehicle();
         var vehicle = lockOwnedVehicle(id, ownerId);
         if (vehicle.getStatus() != VehicleStatus.REJECTED && vehicle.getStatus() != VehicleStatus.OFFLINE) {
             throw conflict("VEHICLE_STATE_CONFLICT", "仅已退回或已下架的车源可以修改并重新提交。");
@@ -95,6 +104,7 @@ public class VehicleService {
         vehicle.setListedAt(null);
         vehicles.updateById(vehicle);
         audit.record(ownerId, "SUBMIT_VEHICLE", "VEHICLE", id, "整理资料后重新提交审核");
+        saveMedia(id, ownerId, submission);
         return myDetail(id, ownerId);
     }
 
@@ -163,6 +173,15 @@ public class VehicleService {
             throw missing();
         }
         return vehicle;
+    }
+
+    /** 资料随车源事务提交，避免待审车源先出现而附件尚未完成。 */
+    private void saveMedia(long vehicleId, long ownerId, VehicleSubmission submission) {
+        if (submission.reportFile() != null && submission.report() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "添加报告附件前请填写报告信息。");
+        }
+        if (submission.photo() != null) attachments.upload(vehicleId, ownerId, null, submission.photo());
+        if (submission.report() != null) reports.create(vehicleId, ownerId, submission.report(), submission.reportFile());
     }
 
     private void validateDraft(VehicleDraft draft) {

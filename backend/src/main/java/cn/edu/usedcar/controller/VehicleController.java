@@ -2,11 +2,13 @@ package cn.edu.usedcar.controller;
 
 import cn.edu.usedcar.common.PageResult;
 import cn.edu.usedcar.config.OpenApiConfig;
+import cn.edu.usedcar.dto.ReportRequest;
 import cn.edu.usedcar.dto.VehicleRequest;
 import cn.edu.usedcar.dto.VehicleView;
 import cn.edu.usedcar.model.SessionAccount;
 import cn.edu.usedcar.model.VehicleFilter;
 import cn.edu.usedcar.model.VehicleStatus;
+import cn.edu.usedcar.model.VehicleSubmission;
 import cn.edu.usedcar.service.VehicleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -15,6 +17,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -24,8 +27,10 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 车源公开检索和发布人专属接口。账号由会话提供，写入请求不能指定发布人。
@@ -68,19 +73,44 @@ public class VehicleController {
         return VehicleView.from(vehicles.myDetail(id, actor.profile().id()));
     }
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "发布车源并提交审核", security = @SecurityRequirement(name = OpenApiConfig.SESSION_COOKIE))
     VehicleView create(@Valid @RequestBody VehicleRequest request,
                        @AuthenticationPrincipal @Parameter(hidden = true) SessionAccount actor) {
-        return VehicleView.from(vehicles.create(actor.profile().id(), request.toDraft()));
+        return VehicleView.from(vehicles.create(actor.profile().id(), new VehicleSubmission(request.toDraft())));
     }
 
-    @PutMapping("/{id}")
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "发布车源与可选照片、报告", security = @SecurityRequirement(name = OpenApiConfig.SESSION_COOKIE))
+    VehicleView createWithPhoto(@Valid @RequestPart("vehicle") VehicleRequest request,
+                                @RequestPart(value = "photo", required = false) MultipartFile photo,
+                                @Valid @RequestPart(value = "report", required = false) ReportRequest report,
+                                @RequestPart(value = "reportFile", required = false) MultipartFile reportFile,
+                                @AuthenticationPrincipal @Parameter(hidden = true) SessionAccount actor) {
+        return MultipartUploads.withFile(photo, image -> MultipartUploads.withFile(reportFile, file ->
+                VehicleView.from(vehicles.create(actor.profile().id(), new VehicleSubmission(
+                        request.toDraft(), image, report == null ? null : report.toDraft(), file)))));
+    }
+
+    @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "修正并重新提交车源", security = @SecurityRequirement(name = OpenApiConfig.SESSION_COOKIE))
     VehicleView resubmit(@PathVariable long id, @Valid @RequestBody VehicleRequest request,
                          @AuthenticationPrincipal @Parameter(hidden = true) SessionAccount actor) {
-        return VehicleView.from(vehicles.resubmit(id, actor.profile().id(), request.toDraft()));
+        return VehicleView.from(vehicles.resubmit(id, actor.profile().id(), new VehicleSubmission(request.toDraft())));
+    }
+
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "重提车源并补充照片", security = @SecurityRequirement(name = OpenApiConfig.SESSION_COOKIE))
+    VehicleView resubmitWithPhoto(@PathVariable long id, @Valid @RequestPart("vehicle") VehicleRequest request,
+                                  @RequestPart(value = "photo", required = false) MultipartFile photo,
+                                  @Valid @RequestPart(value = "report", required = false) ReportRequest report,
+                                  @RequestPart(value = "reportFile", required = false) MultipartFile reportFile,
+                                  @AuthenticationPrincipal @Parameter(hidden = true) SessionAccount actor) {
+        return MultipartUploads.withFile(photo, image -> MultipartUploads.withFile(reportFile, file ->
+                VehicleView.from(vehicles.resubmit(id, actor.profile().id(), new VehicleSubmission(
+                        request.toDraft(), image, report == null ? null : report.toDraft(), file)))));
     }
 
     @PostMapping("/{id}/offline")

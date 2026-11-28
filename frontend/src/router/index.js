@@ -27,6 +27,7 @@ export const router = createRouter({
         { path: '', name: 'admin', component: () => import('../modules/admin/WorkspacePage.vue') },
         { path: 'users', name: 'admin-users', component: () => import('../modules/admin/AdminUsersPage.vue'), meta: { administrator: true } },
         { path: 'vehicles', name: 'vehicle-review', component: () => import('../modules/vehicles/VehicleReviewPage.vue') },
+        { path: 'reports', name: 'report-review', component: () => import('../modules/reports/ReportReviewPage.vue') },
         { path: 'dictionaries', name: 'admin-dictionaries', component: () => import('../modules/admin/DictionaryPage.vue'), meta: { administrator: true } },
       ],
     },

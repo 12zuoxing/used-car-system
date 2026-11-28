@@ -11,5 +11,5 @@ public record VehicleRecord(long id, long brandId, String brandName, long cityId
                             int registrationYear, int mileage, BigDecimal price, Transmission transmission,
                             Fuel fuel, SaleMode saleMode, String description, VehicleStatus status,
                             LocalDateTime listedAt, String ownerName, String reviewNote,
-                            LocalDateTime reviewedAt, Long revision) {
+                            LocalDateTime reviewedAt, Long revision, Long coverPhotoId) {
 }

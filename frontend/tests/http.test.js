@@ -51,3 +51,16 @@ test('a business permission denial is reported without repeating the action', as
     (error) => error instanceof ApiError && error.status === 403 && error.message === '权限不足')
   assert.equal(writes, 1)
 })
+
+test('multipart writes preserve file parts and let the browser set its boundary', async () => {
+  const form = new FormData()
+  form.append('file', new Blob(['content']), 'example.png')
+  const client = createHttpClient(async (url, options) => {
+    if (url.endsWith('/csrf')) return json({ headerName: 'X-CSRF-TOKEN', token: 'media' })
+    assert.equal(options.body, form)
+    assert.equal(options.headers.has('Content-Type'), false)
+    assert.equal(options.headers.get('X-CSRF-TOKEN'), 'media')
+    return json({ id: 1 }, 201)
+  })
+  assert.deepEqual(await client.request('/vehicles/1/attachments', { method: 'POST', body: form }), { id: 1 })
+})

@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 /**
  * 仅返回可供界面显示的业务信息，解析异常和认证异常不向外暴露内部细节。
@@ -15,6 +16,12 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
  */
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ResponseEntity<ApiError> uploadTooLarge() {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(new ApiError("FILE_TOO_LARGE", "上传文件或请求超过大小限制。"));
+    }
+
     @ExceptionHandler(ApiException.class)
     ResponseEntity<ApiError> businessError(ApiException error) {
         return ResponseEntity.status(error.status()).body(new ApiError(error.code(), error.getMessage()));

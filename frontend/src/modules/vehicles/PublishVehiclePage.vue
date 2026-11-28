@@ -4,7 +4,9 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
+import { acceptedPhotos, withVehicleMedia } from '../../api/media.js'
 import { vehicleApi } from '../../api/vehicles.js'
+import ReportFields from '../reports/ReportFields.vue'
 import { canEdit, fuels, saleModes, transmissions } from './vehicleLabels.js'
 
 const route = useRoute()
@@ -21,6 +23,10 @@ const preparing = ref(false)
 const saving = ref(false)
 const error = ref('')
 const changedDictionary = ref(false)
+const photo = ref(null)
+const includeReport = ref(false)
+const reportDraft = ref({ source: '', reportDate: '', summary: '' })
+const reportFile = ref(null)
 let loadVersion = 0
 
 function applyCatalog(options) {
@@ -40,6 +46,10 @@ async function prepare() {
   preparing.value = true
   error.value = ''
   changedDictionary.value = false
+  photo.value = null
+  includeReport.value = false
+  reportDraft.value = { source: '', reportDate: '', summary: '' }
+  reportFile.value = null
   Object.assign(form, defaults)
   try {
     const [options, previous] = await Promise.all([
@@ -71,7 +81,10 @@ async function submit() {
   error.value = ''
   try {
     const payload = { ...form, model: form.model.trim(), description: form.description.trim() }
-    const vehicle = await (editingId ? vehicleApi.resubmit(editingId, payload) : vehicleApi.publish(payload))
+    const report = includeReport.value ? { ...reportDraft.value, source: reportDraft.value.source.trim(),
+      summary: reportDraft.value.summary.trim() } : null
+    const body = withVehicleMedia(payload, photo.value, report, report ? reportFile.value : null)
+    const vehicle = await (editingId ? vehicleApi.resubmit(editingId, body) : vehicleApi.publish(body))
     if (version === loadVersion) await router.replace({ name: 'my-vehicle-detail', params: { id: vehicle.id } })
   } catch (failure) {
     if (version === loadVersion) {
@@ -118,6 +131,15 @@ watch(() => route.fullPath, prepare, { immediate: true })
         <label>经营方式<select v-model="form.saleMode"><option v-for="(text, key) in saleModes" :key="key" :value="key">{{ text }}</option></select></label>
         <p v-if="form.saleMode === 'CONSIGN'" class="vehicle-form-wide muted-text">代销车源需完成委托流程才能上架。</p>
         <label class="vehicle-form-wide">车辆描述<textarea v-model.trim="form.description" rows="5" maxlength="1000" required /></label>
+        <label class="vehicle-form-wide">车辆照片（可选）
+          <input type="file" :accept="acceptedPhotos" :disabled="saving" @change="photo = $event.target.files[0] ?? null" />
+          <small class="muted-text">支持 JPEG、PNG、WebP。提交后可在我的车源补充照片和登记报告。</small>
+        </label>
+        <label class="vehicle-form-wide vehicle-form-toggle">
+          <input v-model="includeReport" type="checkbox" :disabled="saving" @change="reportFile = null" />
+          同时登记车况报告
+        </label>
+        <ReportFields v-if="includeReport" v-model="reportDraft" :disabled="saving" @file-selected="reportFile = $event" />
         <div class="vehicle-form-wide vehicle-actions">
           <Button type="submit" :label="editing ? '重新提交审核' : '提交审核'" :loading="saving"
             :disabled="!catalog.brands.length || !catalog.cities.length" />

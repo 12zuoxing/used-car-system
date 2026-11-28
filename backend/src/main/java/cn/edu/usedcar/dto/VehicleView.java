@@ -19,11 +19,11 @@ public record VehicleView(long id, long brandId, String brandName, long cityId, 
                           int registrationYear, int mileage, BigDecimal price, Transmission transmission,
                           Fuel fuel, SaleMode saleMode, String description, VehicleStatus status,
                           LocalDateTime listedAt, String ownerName, String reviewNote,
-                          LocalDateTime reviewedAt, Long revision) {
+                          LocalDateTime reviewedAt, Long revision, Long coverPhotoId) {
     public static VehicleView from(VehicleRecord vehicle) {
         return new VehicleView(vehicle.id(), vehicle.brandId(), vehicle.brandName(), vehicle.cityId(), vehicle.cityName(),
                 vehicle.model(), vehicle.registrationYear(), vehicle.mileage(), vehicle.price(), vehicle.transmission(),
                 vehicle.fuel(), vehicle.saleMode(), vehicle.description(), vehicle.status(), vehicle.listedAt(),
-                vehicle.ownerName(), vehicle.reviewNote(), vehicle.reviewedAt(), vehicle.revision());
+                vehicle.ownerName(), vehicle.reviewNote(), vehicle.reviewedAt(), vehicle.revision(), vehicle.coverPhotoId());
     }
 }

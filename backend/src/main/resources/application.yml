@@ -46,6 +46,8 @@ springdoc:
     validator-url: none
 
 app:
+  # 文件保存在后端独立目录，下载必须经过车源与报告权限检查。
+  uploads: ${APP_UPLOADS:./data/uploads}
   admin:
     # 只在数据库尚无管理员且启动时提供凭据的情况下初始化。
     username: ${APP_ADMIN_USERNAME:}

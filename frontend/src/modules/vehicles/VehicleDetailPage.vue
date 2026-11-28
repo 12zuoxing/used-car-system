@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
 import { vehicleApi } from '../../api/vehicles.js'
+import VehicleMediaPanel from './VehicleMediaPanel.vue'
 import { canEdit, formatMileage, formatPrice, fuels, saleModes, statuses, transmissions, vehicleTitle } from './vehicleLabels.js'
 
 const props = defineProps({ managed: { type: Boolean, default: false } })
@@ -43,6 +44,7 @@ watch(() => [route.params.id, props.managed], load, { immediate: true })
         <strong>{{ formatPrice(vehicle.price) }}</strong>
       </section>
       <div class="vehicle-detail-body">
+        <VehicleMediaPanel :key="vehicle.id" :vehicle="vehicle" :managed="managed" />
         <section class="vehicle-panel">
           <h2>车辆参数</h2>
           <dl class="vehicle-facts">

@@ -2,6 +2,7 @@ package cn.edu.usedcar.controller;
 
 import java.util.Locale;
 import java.util.UUID;
+import java.util.Base64;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,6 +13,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -36,6 +40,139 @@ class VehicleIntegrationTest {
     @Autowired private MockMvc mvc;
     @Autowired private ObjectMapper json;
     @Autowired private JdbcTemplate jdbc;
+    @org.junit.jupiter.api.io.TempDir
+    static java.nio.file.Path uploadDirectory;
+
+    @DynamicPropertySource
+    static void uploads(DynamicPropertyRegistry properties) {
+        properties.add("app.uploads", () -> uploadDirectory.toString());
+    }
+
+    @Test
+    void photosAndReportsHonorVehicleOwnershipAndPublicationState() throws Exception {
+        var admin = login("test_admin");
+        var seller = register();
+        var outsider = register();
+        long brand = dictionary(admin, "BRAND");
+        long city = dictionary(admin, "CITY");
+        var first = read(call(post("/api/vehicles"), seller.session(), vehicle(brand, city, "DIRECT", "照片测试", 2020, "50000"))
+                .andExpect(status().isCreated()));
+        var second = read(call(post("/api/vehicles"), seller.session(), vehicle(brand, city, "DIRECT", "另一辆车", 2020, "51000"))
+                .andExpect(status().isCreated()));
+        long id = first.get("id").asLong();
+        byte[] png = png();
+        var image = new MockMultipartFile("file", "实拍.png", "image/png", png);
+        long photoId = read(call(multipart("/api/vehicles/" + id + "/attachments").file(image),
+                seller.session(), null).andExpect(status().isCreated())).get("id").asLong();
+        mvc.perform(get("/api/attachments/" + photoId)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/attachments/" + photoId).session(outsider.session())).andExpect(status().isNotFound());
+        mvc.perform(get("/api/attachments/" + photoId).session(seller.session()))
+                .andExpect(status().isOk()).andExpect(content().bytes(png));
+        byte[] webp = Base64.getDecoder().decode("UklGRjwAAABXRUJQVlA4IDAAAADQAQCdASoEAAQAAUAmJaACdLoB+AADsAD+71Ev/lKvBY3R5/+BO/AnfgTv/CBAAAA=");
+        call(multipart("/api/vehicles/" + id + "/attachments")
+                .file(new MockMultipartFile("file", "另一张.webp", "image/webp", webp)), seller.session(), null)
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.mime").value("image/webp"));
+        call(post("/api/admin/vehicles/" + id + "/review"), admin, review(first.get("revision").asLong(), "APPROVE", ""))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("STALE_REVIEW"));
+        long revision = read(mvc.perform(get("/api/vehicles/mine/" + id).session(seller.session()))).get("revision").asLong();
+        call(post("/api/admin/vehicles/" + id + "/review"), admin, review(revision, "APPROVE", ""))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/attachments/" + photoId)).andExpect(status().isOk());
+
+        String draft = "{\"source\":\"查博士\",\"reportDate\":\"2024-05-02\",\"summary\":\"检查了外观和车身。\"}";
+        long reportId = read(call(post("/api/vehicles/" + id + "/reports"), seller.session(), draft)
+                .andExpect(status().isCreated())).get("id").asLong();
+        byte[] pdf;
+        try (var document = new org.apache.pdfbox.pdmodel.PDDocument();
+             var output = new java.io.ByteArrayOutputStream()) {
+            document.addPage(new org.apache.pdfbox.pdmodel.PDPage());
+            document.save(output);
+            pdf = output.toByteArray();
+        }
+        var file = new MockMultipartFile("file", "检测报告.pdf", "application/pdf", pdf);
+        call(multipart("/api/vehicles/" + second.get("id").asLong() + "/attachments").file(file)
+                .param("reportId", Long.toString(reportId)), seller.session(), null).andExpect(status().isNotFound());
+        long reportFile = read(call(multipart("/api/vehicles/" + id + "/attachments").file(file)
+                .param("reportId", Long.toString(reportId)), seller.session(), null)
+                .andExpect(status().isCreated())).get("id").asLong();
+        mvc.perform(get("/api/vehicles/" + id + "/reports")).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(get("/api/attachments/" + reportFile)).andExpect(status().isNotFound());
+        call(post("/api/admin/reports/" + reportId + "/review"), admin, review(0, "APPROVE", ""))
+                .andExpect(status().isConflict());
+        call(post("/api/admin/reports/" + reportId + "/review"), admin, review(reportFile, "APPROVE", ""))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/vehicles/" + id + "/reports")).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].source").value("查博士")).andExpect(jsonPath("$[0].authorName").doesNotExist());
+        mvc.perform(get("/api/attachments/" + reportFile)).andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.startsWith("attachment")))
+                .andExpect(content().bytes(pdf));
+        call(post("/api/vehicles/" + id + "/offline"), seller.session(), null).andExpect(status().isOk());
+        mvc.perform(get("/api/attachments/" + reportFile)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void rejectsFakeAndOversizedFilesAndRollsBackIncompleteMultipartReports() throws Exception {
+        var admin = login("test_admin");
+        var seller = register();
+        long brand = dictionary(admin, "BRAND");
+        long city = dictionary(admin, "CITY");
+        long id = read(call(post("/api/vehicles"), seller.session(), vehicle(brand, city, "DIRECT", "拒绝无效附件", 2020, "50000"))
+                .andExpect(status().isCreated())).get("id").asLong();
+        var forged = new MockMultipartFile("file", "伪装.png", "image/png", "<html>not an image</html>".getBytes());
+        call(multipart("/api/vehicles/" + id + "/attachments").file(forged), seller.session(), null)
+                .andExpect(status().isUnsupportedMediaType());
+        byte[] incompleteJpeg = {(byte) 0xff, (byte) 0xd8, (byte) 0xff, (byte) 0xff, (byte) 0xd9};
+        call(multipart("/api/vehicles/" + id + "/attachments")
+                .file(new MockMultipartFile("file", "损坏.jpg", "image/jpeg", incompleteJpeg)), seller.session(), null)
+                .andExpect(status().isUnsupportedMediaType());
+        var tooLarge = new MockMultipartFile("file", "过大.png", "image/png", new byte[5 * 1024 * 1024 + 1]);
+        call(multipart("/api/vehicles/" + id + "/attachments").file(tooLarge), seller.session(), null)
+                .andExpect(status().isPayloadTooLarge());
+        var report = new MockMultipartFile("report", "", "application/json",
+                "{\"source\":\"查博士\",\"reportDate\":\"2024-05-02\",\"summary\":\"附件失败后不应有记录。\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        call(multipart("/api/vehicles/" + id + "/reports").file(report).file(forged), seller.session(), null)
+                .andExpect(status().isUnsupportedMediaType());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM vehicle_report WHERE vehicle_id = ?", Long.class, id)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM attachment WHERE vehicle_id = ?", Long.class, id)).isZero();
+    }
+
+    @Test
+    void publishesCompleteVehicleMediaOrRollsBackAllOfIt() throws Exception {
+        var admin = login("test_admin");
+        var seller = register();
+        long brand = dictionary(admin, "BRAND");
+        long city = dictionary(admin, "CITY");
+        var vehicle = new MockMultipartFile("vehicle", "", "application/json",
+                vehicle(brand, city, "DIRECT", "原子发布", 2020, "50000").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var report = new MockMultipartFile("report", "", "application/json",
+                "{\"source\":\"查博士\",\"reportDate\":\"2024-05-02\",\"summary\":\"外观已检测。\"}"
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var photo = new MockMultipartFile("photo", "有效照片.png", "image/png", png());
+        var invalid = new MockMultipartFile("reportFile", "无效.pdf", "application/pdf",
+                "%PDF-1.4\n%%EOF\n".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+        long countBefore;
+        try (var files = java.nio.file.Files.list(uploadDirectory)) {
+            countBefore = files.count();
+        }
+        call(multipart("/api/vehicles").file(vehicle).file(photo).file(report).file(invalid), seller.session(), null)
+                .andExpect(status().isUnsupportedMediaType());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM vehicle WHERE owner_id = ?", Long.class, seller.id()))
+                .isZero();
+        try (var files = java.nio.file.Files.list(uploadDirectory)) {
+            assertThat(files.count()).isEqualTo(countBefore);
+        }
+        var created = read(call(multipart("/api/vehicles").file(vehicle).file(photo).file(report), seller.session(), null)
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.coverPhotoId").isNumber()));
+        mvc.perform(get("/api/vehicles/" + created.get("id").asLong() + "/reports").session(seller.session()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].status").value("PENDING"));
+    }
+
+    private static byte[] png() throws Exception {
+        var output = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(4, 4, java.awt.image.BufferedImage.TYPE_INT_RGB),
+                "png", output);
+        return output.toByteArray();
+    }
 
     @Test
     void sellReviewResubmitListAndTakeOffline() throws Exception {
