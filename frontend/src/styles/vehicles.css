@@ -4,21 +4,31 @@
  */
 .vehicle-market, .vehicle-page { padding-block: 24px 48px; }
 .market-hero {
-  position: relative; isolation: isolate; min-height: 218px; overflow: hidden;
-  display: flex; align-items: center; border-radius: 13px; background: var(--navy); color: var(--white);
+  position: relative; isolation: isolate; min-height: clamp(218px, 24vw, 308px); overflow: hidden;
+  display: flex; align-items: center; border-radius: 19px; background: #171f24; color: var(--white);
+  box-shadow: 0 12px 32px #15212c21;
 }
-.market-hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 74% 56%; z-index: -2; }
-.market-hero::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, #08162deb, #08162d6e 64%, transparent); }
+.market-hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 74% 58%; z-index: -2; }
+.market-hero::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, #0d161cf5, #0d161cd8 30%, #0d161c23 70%, transparent); }
 .market-hero > div { padding: clamp(21px, 5vw, 47px); }
-.market-hero h1 { font-size: clamp(30px, 5vw, 46px); }
-.market-hero p { margin-top: 8px; color: #d7e5f9; }
+.market-hero h1 { font-size: clamp(30px, 5vw, 52px); letter-spacing: -.045em; }
+.market-hero p { margin-top: 8px; color: #e1ece9; }
+
+/* 快捷链接有持久化筛选态，也可直接复制链接。 */
+.market-shortcuts { display: flex; flex-wrap: wrap; gap: 7px; margin-block: 16px 11px; }
+.market-shortcuts a {
+  display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px;
+  color: #293d38; background: #fff; border: 1px solid #d8e3df; border-radius: 20px;
+  font-size: 13px; font-weight: 650; transition: background .2s ease, border-color .2s ease;
+}
+.market-shortcuts a:hover, .market-shortcuts a[aria-current] { background: #e6f6c0; border-color: #adc07f; }
 
 .market-filters, .vehicle-panel, .vehicle-detail-heading {
   border: 1px solid var(--line); border-radius: 12px; background: var(--white);
 }
 .market-filters {
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px;
-  align-items: end; margin: 16px 0 20px; padding: 16px 19px;
+  align-items: end; margin: 0 0 23px; padding: 16px 19px;
 }
 .market-filters label, .market-range, .vehicle-form label, .vehicle-toolbar label,
 .vehicle-dialog-label, .vehicle-dialog-form label { display: grid; gap: 5px; min-width: 0; font-weight: 600; }
@@ -43,6 +53,13 @@
 .vehicle-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .vehicle-card { border: 1px solid var(--line); background: var(--white); border-radius: 10px; min-width: 0; }
 .vehicle-card:hover { border-color: #8ba9d3; }
+.market-results .vehicle-card {
+  border-radius: 14px;
+  transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+  animation: market-card-enter .42s cubic-bezier(.22, .61, .36, 1) both;
+  animation-delay: var(--vehicle-enter-delay, 0ms);
+}
+.market-results .vehicle-card:is(:hover, :focus-within) { border-color: #aabbb8; box-shadow: 0 12px 28px #182f3022; transform: translateY(-3px); }
 .vehicle-card-link { display: grid; gap: 9px; padding: 17px; color: var(--ink); border-radius: inherit; }
 .vehicle-card-top, .vehicle-card-bottom { display: flex; justify-content: space-between; gap: 6px; align-items: center; }
 .vehicle-brand { color: var(--muted); font-size: 13px; }
@@ -74,7 +91,11 @@
 .table-vehicle-meta { display: block; color: var(--muted); margin-top: 3px; }
 .review-content, .vehicle-dialog-form { display: grid; gap: 9px; }
 
-.vehicle-card-photo { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 7px; }
+.vehicle-card-media { overflow: hidden; border-radius: 8px; background: #eaf0f1; }
+.vehicle-card-photo { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.market-results .vehicle-card-photo { transition: transform .5s cubic-bezier(.22, .61, .36, 1); }
+.market-results .vehicle-card:is(:hover, :focus-within) .vehicle-card-photo { transform: scale(1.045); }
+@keyframes market-card-enter { from { opacity: 0; translate: 0 9px; } to { opacity: 1; translate: 0; } }
 .vehicle-gallery { display: grid; gap: 10px; margin-top: 8px; }
 .vehicle-gallery-main { display: block; width: 100%; max-height: 420px; object-fit: contain; border-radius: 8px; background: var(--background); }
 .vehicle-gallery-compact .vehicle-gallery-main { max-height: 220px; }
@@ -100,6 +121,12 @@
 }
 @media (max-width: 510px) {
   .market-hero { min-height: 165px; }
-  .market-hero::after { background: linear-gradient(90deg, #08162def, #08162d67); }
+  .market-hero::after { background: linear-gradient(90deg, #0d161cf6, #0d161c73); }
   .vehicle-grid, .vehicle-form, .market-filters { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .market-shortcuts a, .market-results .vehicle-card, .market-results .vehicle-card-photo { animation: none; transition: none; }
+  .market-results .vehicle-card:is(:hover, :focus-within),
+  .market-results .vehicle-card:is(:hover, :focus-within) .vehicle-card-photo { transform: none; }
 }

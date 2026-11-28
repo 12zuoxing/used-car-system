@@ -1,0 +1,258 @@
+/**
+ * 公开车源页面布局、可交互筛选、报价与大图。共用组件通过页面类限定视觉样式。
+ * @author pangzhihao
+ */
+.market-page, .vehicle-detail-public {
+  --showcase-ink: #182421;
+  --showcase-quiet: #586a64;
+  --showcase-line: #dce6e0;
+  --showcase-paper: #f6f9f5;
+  --showcase-tint: #eaf6ce;
+  --showcase-action: #24503c;
+  width: min(1260px, calc(100% - 48px));
+}
+
+.market-page .market-hero {
+  min-height: clamp(192px, 19vw, 255px);
+  justify-content: space-between;
+  align-items: flex-end;
+  border-radius: 22px;
+}
+.market-page .market-hero > div { padding: clamp(23px, 4vw, 49px); }
+.market-page .market-hero img { object-position: 68% 57%; }
+.market-publish {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  flex: 0 0 auto;
+  margin: 0 clamp(23px, 4vw, 49px) clamp(23px, 4vw, 49px) 0;
+  padding: 9px 15px;
+  color: #1d2d23;
+  background: #def795;
+  border-radius: 9px;
+  font-weight: 700;
+}
+.market-publish:hover { background: #eeffc2; }
+.market-publish:focus-visible { outline-color: #def795; }
+.market-page .market-shortcuts { margin-block: 20px; }
+.market-page .market-shortcuts a { min-height: 37px; padding-inline: 13px; }
+
+/* 筛选与结果在宽屏并排，窄屏使用原地展开，保留原表单的提交语义。 */
+.market-layout {
+  display: grid;
+  align-items: start;
+  grid-template-columns: minmax(218px, 255px) minmax(0, 1fr);
+  gap: clamp(17px, 2.6vw, 34px);
+}
+.market-layout .market-filters {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 18px 17px;
+  margin: 0;
+  border-color: var(--showcase-line);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px #213f3410;
+}
+.market-filter-toggle { display: none; }
+.market-filter-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.market-filter-heading h2 { margin: 0; font-size: 17px; color: var(--showcase-ink); }
+.market-filter-heading button { min-height: 32px; color: var(--showcase-action); }
+.market-layout .market-filters select, .market-layout .market-filters input {
+  background: var(--showcase-paper);
+  border-color: var(--showcase-line);
+  min-height: 38px;
+}
+.market-layout .market-filters .p-button {
+  justify-content: center;
+  width: 100%;
+  color: #fff;
+  background: var(--showcase-action);
+  border-color: var(--showcase-action);
+}
+.market-layout .market-filters .p-button:hover { background: #173e2b; border-color: #173e2b; }
+
+.market-results { min-width: 0; }
+.market-results-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 11px; margin: 0 0 13px; }
+.market-results-head h2 { margin: 0; color: var(--showcase-ink); font-size: clamp(22px, 2.7vw, 32px); letter-spacing: -.03em; }
+.market-count { color: var(--showcase-quiet); font-variant-numeric: tabular-nums; }
+.market-active-filters { display: flex; flex-wrap: wrap; gap: 7px; list-style: none; margin: 0 0 15px; padding: 0; }
+.market-active-filters button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  max-width: 100%;
+  padding: 3px 10px;
+  background: var(--showcase-tint);
+  border: 1px solid #d7e9b1;
+  border-radius: 7px;
+  color: #263924;
+  cursor: pointer;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.market-active-filters button:hover { background: #d6ecac; }
+.market-active-filters button span { font-size: 17px; line-height: 1; }
+.market-active-filters button.market-clear-filters { background: #fff; border-color: var(--showcase-line); color: var(--showcase-action); }
+.market-empty {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  padding: 31px 24px;
+  border: 1px dashed #c7d8cd;
+}
+.market-empty button { padding-inline: 0; color: var(--showcase-action); }
+
+/* 首页近期车源和市场卡片使用同一张封面与真实成交方式。 */
+:is(.market-page, .home-latest) .vehicle-card {
+  border-color: #e0e8e3;
+  border-radius: 16px;
+  box-shadow: 0 6px 18px #172e2612;
+}
+:is(.market-page, .home-latest) .vehicle-card-link { padding: 11px 11px 12px; gap: 7px; }
+:is(.market-page, .home-latest) .vehicle-card-media { border-radius: 11px; }
+:is(.market-page, .home-latest) .vehicle-card-top { margin-top: 4px; }
+:is(.market-page, .home-latest) .vehicle-card-bottom { border-color: #e2ebe6; padding-top: 8px; }
+:is(.market-page, .home-latest) .vehicle-card-bottom strong { color: #244934; font-size: clamp(19px, 2.3vw, 25px); }
+.vehicle-card-no-photo { display: grid; place-items: center; aspect-ratio: 16 / 9; color: #526763; font-size: 13px; }
+.vehicle-card-bottom > .vehicle-card-arrow {
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #eef4ea;
+  color: #325843;
+  font-size: 15px;
+}
+.vehicle-card-link:is(:hover, :focus-visible) .vehicle-card-arrow { background: #def2b8; }
+
+/* 在公开详情首屏突出报价和车源身份，具体参数、报告与业务操作各有位置。 */
+.vehicle-detail-quote { display: grid; gap: 2px; }
+.vehicle-detail-quote span { color: var(--muted); font-weight: 650; font-size: 13px; }
+.vehicle-detail-public .vehicle-back { color: var(--showcase-action); font-weight: 650; }
+.vehicle-detail-public .vehicle-detail-heading {
+  padding: clamp(19px, 3.4vw, 37px);
+  border: 0;
+  border-radius: 20px;
+  color: #eef6ee;
+  background: radial-gradient(ellipse at 100% 10%, #2e5042 1%, transparent 64%), #192925;
+}
+.vehicle-detail-public .vehicle-detail-heading h1 { font-size: clamp(27px, 4.5vw, 49px); letter-spacing: -.035em; }
+.vehicle-detail-public .vehicle-detail-heading p, .vehicle-detail-public .vehicle-detail-quote span { color: #d3e5d8; }
+.vehicle-detail-public .vehicle-detail-heading strong { color: #def795; font-size: clamp(27px, 4.3vw, 49px); line-height: 1.12; }
+.vehicle-detail-public .vehicle-detail-quote { padding-top: 4px; }
+.vehicle-detail-jumps { display: flex; gap: 7px; flex-wrap: wrap; margin-block: 13px 15px; }
+.vehicle-detail-jumps button {
+  padding: 7px 12px;
+  border: 1px solid #d2e0d9;
+  background: white;
+  border-radius: 8px;
+  color: var(--showcase-action);
+  cursor: pointer;
+}
+.vehicle-detail-jumps button:hover { background: var(--showcase-tint); }
+.vehicle-detail-public .vehicle-detail-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(275px, 345px); align-items: start; gap: 17px; }
+.vehicle-detail-public .vehicle-detail-body, .vehicle-detail-actions { margin: 0; min-width: 0; }
+.vehicle-detail-actions { display: grid; align-items: start; gap: 13px; }
+.vehicle-detail-public .vehicle-panel { border-color: var(--showcase-line); border-radius: 17px; }
+.vehicle-detail-public .vehicle-panel h2 { margin-bottom: 2px; color: var(--showcase-ink); }
+.vehicle-detail-public .vehicle-panel h2[id] { scroll-margin-block-start: 18px; }
+.vehicle-detail-public .vehicle-photo-panel { padding: clamp(12px, 2vw, 19px); }
+.vehicle-detail-public .vehicle-spec-panel h3 { font-size: 16px; margin: 17px 0 0; }
+.vehicle-detail-public .vehicle-facts > div { border: 1px solid var(--showcase-line); border-radius: 8px; background: var(--showcase-paper); padding: 9px; }
+.vehicle-detail-public .vehicle-report-item { margin-top: 11px; padding: 15px; border: 1px solid var(--showcase-line); border-radius: 10px; background: var(--showcase-paper); }
+.vehicle-detail-public .report-files { margin-block: 8px 0; }
+.vehicle-detail-actions .vehicle-section-head { display: grid; justify-content: start; gap: 13px; margin: 0; }
+.vehicle-detail-actions .vehicle-form { grid-template-columns: 1fr; }
+.vehicle-detail-actions input[type="datetime-local"] { min-width: 0; }
+.vehicle-detail-actions > .vehicle-panel:first-child { background: #f1f8e5; }
+.vehicle-detail-actions :is(.solid-link, .p-button) { background: var(--showcase-action); color: white; border-color: var(--showcase-action); }
+.vehicle-detail-actions :is(.solid-link, .p-button):hover { background: #173e2b; border-color: #173e2b; }
+
+.vehicle-gallery-stage { position: relative; }
+.vehicle-gallery-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  position: relative;
+  overflow: hidden;
+  border: 0;
+  border-radius: 12px;
+  background: #edf2ee;
+  cursor: zoom-in;
+}
+.vehicle-gallery-stage .vehicle-gallery-main { height: clamp(245px, 39vw, 489px); max-height: none; background: #edf2ee; }
+.vehicle-gallery-zoom, .vehicle-gallery-step, .vehicle-gallery-count {
+  position: absolute;
+  color: #fff;
+  background: #172923e8;
+  border: 1px solid #fff5;
+}
+.vehicle-gallery-zoom, .vehicle-gallery-count { bottom: 12px; border-radius: 7px; padding: 4px 8px; font-size: 13px; }
+.vehicle-gallery-zoom { right: 12px; }
+.vehicle-gallery-count { left: 12px; }
+.vehicle-gallery-step {
+  top: 50%;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+.vehicle-gallery-prev { left: 12px; }
+.vehicle-gallery-next { right: 12px; }
+.vehicle-gallery-step:hover { background: #2b4a38; }
+.vehicle-gallery-preview { display: grid; justify-items: stretch; gap: 10px; }
+.vehicle-gallery-preview img { width: 100%; max-height: 68vh; object-fit: contain; border-radius: 9px; background: #edf2ee; }
+.vehicle-gallery-preview-actions { display: flex; justify-content: center; align-items: center; gap: 12px; }
+.vehicle-gallery-preview-actions button {
+  width: 42px;
+  height: 38px;
+  border: 1px solid #ceded4;
+  border-radius: 7px;
+  background: #edf2ee;
+  color: #23523c;
+  cursor: pointer;
+}
+
+@media (min-width: 1001px) {
+  .vehicle-detail-actions { position: sticky; top: 16px; }
+}
+@media (max-width: 1080px) {
+  .market-layout .vehicle-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 820px) {
+  .market-page, .vehicle-detail-public { width: calc(100% - 28px); padding-block-start: 16px; }
+  .market-layout, .vehicle-detail-public .vehicle-detail-layout { grid-template-columns: 1fr; }
+  .market-filter-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    margin-bottom: 12px;
+    padding: 9px 13px;
+    border: 1px solid var(--showcase-line);
+    border-radius: 8px;
+    background: white;
+    color: var(--showcase-action);
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .market-layout .market-filters { display: none; }
+  .market-layout .market-filters-open { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .market-filter-heading { grid-column: 1 / -1; }
+  .market-page .market-hero { align-items: start; flex-direction: column; justify-content: center; }
+  .market-publish { margin: 0 0 20px 23px; font-size: 13px; }
+  .market-page .market-hero > div { padding-bottom: 12px; }
+}
+@media (max-width: 510px) {
+  .market-layout .vehicle-grid, .market-layout .market-filters-open { grid-template-columns: 1fr; }
+  .market-page .market-hero { min-height: 175px; }
+  .market-page .market-shortcuts { margin-block: 14px; }
+  .market-page .market-shortcuts a { min-height: 34px; padding-inline: 8px; font-size: 12px; }
+  .vehicle-detail-jumps { gap: 5px; }
+  .vehicle-detail-jumps button { padding-inline: 7px; min-height: 37px; font-size: 12px; }
+  .vehicle-gallery-stage .vehicle-gallery-main { height: clamp(166px, 63vw, 290px); }
+}

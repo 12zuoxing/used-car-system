@@ -58,15 +58,17 @@ watch(() => [props.vehicle.id, props.managed], () => {
 </script>
 
 <template>
-  <section class="vehicle-panel">
-    <h2>车源照片</h2>
+  <section class="vehicle-panel vehicle-photo-panel" aria-labelledby="vehicle-photo-title">
+    <h2 id="vehicle-photo-title">车源照片</h2>
     <p v-if="loading && !photos.length" class="muted-text" role="status">正在读取照片…</p>
-    <VehicleGallery v-else :photos="photos" />
+    <VehicleGallery v-else :photos="photos" :allow-preview="!managed" />
     <AttachmentUpload v-if="canAddPhoto" :vehicle-id="vehicle.id" @uploaded="load" />
   </section>
-  <section class="vehicle-panel">
+  <!-- 详情页可将车辆参数放在照片与报告之间，继续共用同一份媒体读取状态。 -->
+  <slot />
+  <section class="vehicle-panel vehicle-reports-panel" aria-labelledby="vehicle-report-title">
     <div class="vehicle-section-head">
-      <h2>车况报告</h2>
+      <h2 id="vehicle-report-title">车况报告</h2>
       <Button v-if="canAddReport && !writing" label="登记报告" size="small" variant="outlined" @click="writing = true" />
     </div>
     <Message v-if="error" severity="error" :closable="false">
