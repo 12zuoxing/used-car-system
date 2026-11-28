@@ -8,6 +8,7 @@ import { vehicleApi } from '../../api/vehicles.js'
 import AppointmentForm from '../appointments/AppointmentForm.vue' // 公共详情可发起看车预约。
 import { auth } from '../auth/session.js' // 已登录用户可在车源不可售时检查订单状态。
 import BuyVehiclePanel from '../orders/BuyVehiclePanel.vue' // 在公开车源加载成功时展示购买入口。
+import { canRequestPreSale } from '../repairs/repairLabels.js' // 本人车源详情可提供售前整备入口。
 import VehicleMediaPanel from './VehicleMediaPanel.vue'
 import { canEdit, formatMileage, formatPrice, fuels, saleModes, statuses, transmissions, vehicleTitle } from './vehicleLabels.js'
 
@@ -74,6 +75,11 @@ watch(() => [route.params.id, props.managed], load, { immediate: true })
           <h2>审核与发布</h2>
           <p v-if="vehicle.reviewNote" class="vehicle-description">{{ vehicle.reviewNote }}</p>
           <RouterLink v-if="canEdit(vehicle)" class="solid-link" :to="{ name: 'vehicle-edit', params: { id: vehicle.id } }">修改并重提</RouterLink>
+        </section>
+        <!-- 售前表单以本人的车辆编号为申请上下文。 -->
+        <section v-if="managed && canRequestPreSale(vehicle)" class="vehicle-panel booking-section">
+          <h2>售前整备</h2>
+          <div><RouterLink class="solid-link" :to="{ name: 'pre-sale-repair', params: { id: vehicle.id } }">申请售前整备</RouterLink></div>
         </section>
       </div>
     </template>

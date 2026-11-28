@@ -221,6 +221,108 @@ abstract class TradeOrderWorkflowTests {
     }
 
     @Test
+    void preSaleRepairChecksOwnershipAndGoesThroughProcessing() throws Exception {
+        var admin = login("order_admin"); // 准备真实车源审核和工作人员授权。
+        var staff = user(); // 使用独立工作人员办理工单。
+        submit(put("/api/admin/users/" + staff.id() + "/roles"), admin, "{\"roles\":[\"STAFF\"]}").andExpect(status().isOk()); // 按后台实际角色规则授权。
+        var seller = user(); // 车源发布人可登记售前整备。
+        var outsider = user(); // 无关账号用于验收资源隔离。
+        var car = listed(admin, seller, "DIRECT"); // 走正常发布和上架流程。
+        var request = repair("PRE_SALE", car.id(), null); // 售前只需要绑定本人车辆。
+        submit(post("/api/repairs"), outsider.session(), request.toString()).andExpect(status().isNotFound()); // 无关用户不能引用卖家车辆。
+        var past = request.deepCopy().put("visitAt", LocalDateTime.now(ZoneId.of("Asia/Shanghai")).minusHours(1).toString()); // 模拟已经过去的到店时间。
+        submit(post("/api/repairs"), seller.session(), past.toString()).andExpect(status().isBadRequest()); // 已过去的时间无法提交。
+        var blank = request.deepCopy().put("description", "  "); // 模拟没有写整备要求的申请。
+        submit(post("/api/repairs"), seller.session(), blank.toString()).andExpect(status().isBadRequest()); // 空白说明无效。
+        long id = id(submit(post("/api/repairs"), seller.session(), request.toString()).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("PENDING")).andExpect(jsonPath("$.tradeOrderId").doesNotExist())); // 售前不保存订单外键。
+        String detail = "/api/repairs/" + id; // 保存可从个人中心打开的详情路径。
+        String adminStatus = "/api/admin/repairs/" + id + "/status"; // 后台经办地址。
+        mvc.perform(get(detail).session(outsider.session())).andExpect(status().isNotFound()); // 工单描述只向授权账号开放。
+        mvc.perform(get("/api/repairs").session(outsider.session())).andExpect(jsonPath("$.total").value(0)); // 无关用户列表不可见。
+        mvc.perform(get("/api/admin/repairs").session(seller.session())).andExpect(status().isForbidden()); // 普通车主不能查看后台队列。
+        mvc.perform(get("/api/admin/repairs/" + id).session(staff.session())).andExpect(jsonPath("$.description").value("请检查底盘和轮胎")); // 经办人可核对详情。
+        submit(post(adminStatus), staff.session(), repairStatus("COMPLETED", "确认完工")).andExpect(status().isConflict()); // 工单必须先受理才能完工。
+        submit(post(adminStatus), staff.session(), repairStatus("PROCESSING", "已安排检查"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PROCESSING")); // 工作人员开始处理。
+        submit(post(detail + "/cancel"), seller.session(), null).andExpect(status().isConflict()); // 已受理工单不允许申请人直接取消。
+        submit(post(adminStatus), staff.session(), repairStatus("COMPLETED", " ")).andExpect(status().isBadRequest()); // 完工需要业务说明。
+        submit(post(adminStatus), staff.session(), repairStatus("COMPLETED", "已复核底盘及轮胎"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.completedAt").exists()); // 写入完工时间和说明。
+        submit(post(adminStatus), staff.session(), repairStatus("CANCELLED", "完成后取消")).andExpect(status().isConflict()); // 工单完成后拒绝改状态。
+        mvc.perform(get("/api/repairs").param("stage", "PRE_SALE").param("status", "COMPLETED").session(seller.session()))
+                .andExpect(jsonPath("$.items[0].id").value(id)); // 申请人可在自己的售前工单过滤中查到历史。
+        mvc.perform(get(detail).session(seller.session())).andExpect(jsonPath("$.resultNote").value("已复核底盘及轮胎")); // 申请人能读办理说明。
+        assertThat(vehicleState(car.id())).isEqualTo("LISTED"); // 售前办理独立于车辆上架状态。
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE subject_type = 'REPAIR' AND subject_id = ?", Long.class, id))
+                .isEqualTo(2L); // 受理与完工各留下通知。
+    }
+
+    @Test
+    void afterSaleRepairRequiresMatchingCompletedOrderAndCanBeCancelledOrCompleted() throws Exception {
+        var admin = login("order_admin"); // 通过实际审核和交易接口完成测试订单。
+        var seller = user(); // 即使卖家能看订单，也不能替买家提交售后。
+        var buyer = user(); // 成交订单买方可登记售后。
+        var car = listed(admin, seller, "DIRECT"); // 保存订单对应的实际车辆。
+        var otherCar = listed(admin, seller, "DIRECT"); // 另一辆车辆用于验证关联校验。
+        long order = id(postOrder(buyer, car.id(), token()).andExpect(status().isCreated())); // 创建未支付订单。
+        String form = repair("AFTER_SALE", car.id(), order).toString(); // 售后绑定成交车辆和订单。
+        submit(post("/api/repairs"), buyer.session(), repair("AFTER_SALE", car.id(), null).toString())
+                .andExpect(status().isBadRequest()); // 售后必须提供订单依据。
+        submit(post("/api/repairs"), seller.session(), repair("PRE_SALE", car.id(), order).toString())
+                .andExpect(status().isBadRequest()); // 售前不能混用订单外键。
+        submit(post("/api/repairs"), buyer.session(), form).andExpect(status().isConflict()); // 订单未成交时不能申请售后。
+        submit(post("/api/orders/" + order + "/pay"), buyer.session(), null).andExpect(status().isOk()); // 完成模拟支付。
+        submit(post("/api/admin/orders/" + order + "/complete"), admin, "{}").andExpect(status().isOk()); // 登记确认过户。
+        submit(post("/api/repairs"), seller.session(), form).andExpect(status().isNotFound()); // 只有原订单买家可访问售后入口。
+        submit(post("/api/repairs"), buyer.session(), repair("AFTER_SALE", otherCar.id(), order).toString())
+                .andExpect(status().isBadRequest()); // 同一笔订单不能给另一辆车申请送修。
+        submit(post("/api/repairs"), seller.session(), repair("PRE_SALE", car.id(), null).toString())
+                .andExpect(status().isConflict()); // 已交付车辆不能再按卖家的售前整备提交。
+        long first = id(submit(post("/api/repairs"), buyer.session(), form).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.tradeOrderId").value(order)).andExpect(jsonPath("$.stage").value("AFTER_SALE"))); // 保存通过校验的售后关系。
+        submit(post("/api/repairs/" + first + "/cancel"), seller.session(), null).andExpect(status().isNotFound()); // 他人不能取消买家的工单。
+        submit(post("/api/repairs/" + first + "/cancel"), buyer.session(), null).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED")).andExpect(jsonPath("$.completedAt").doesNotExist()); // 申请人可取消尚未受理的送修。
+        long second = id(submit(post("/api/repairs"), buyer.session(), form).andExpect(status().isCreated())); // 保留历史的同时允许另起一笔送修。
+        String processing = "/api/admin/repairs/" + second + "/status"; // 从后台处理真实售后工单。
+        submit(post(processing), admin, repairStatus("PROCESSING", "车辆已接收")).andExpect(status().isOk()); // 工作人员接单。
+        submit(post(processing), admin, repairStatus("COMPLETED", "更换磨损部件并复检")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED")); // 保存售后完工结果。
+        assertThat(vehicleState(car.id())).isEqualTo("SOLD"); // 售后流程不会更改原成交状态。
+    }
+
+    @Test
+    void repairCancellationAndStaffIntakeAreSerialized() throws Exception {
+        var admin = login("order_admin"); // 使用后台审核会话接单。
+        var seller = user(); // 同一笔整备工单的申请方。
+        var car = listed(admin, seller, "DIRECT"); // 准备本人可预约整备的车辆。
+        long id = id(submit(post("/api/repairs"), seller.session(), repair("PRE_SALE", car.id(), null).toString())
+                .andExpect(status().isCreated())); // 创建一笔待处理工单。
+        var results = race(List.of(withCsrf(post("/api/repairs/" + id + "/cancel"), seller.session(), null),
+                withCsrf(post("/api/admin/repairs/" + id + "/status"), admin, repairStatus("PROCESSING", "经办人已接单")))); // 同时取消和受理。
+        assertThat(results.stream().map(result -> result.getResponse().getStatus())).containsExactlyInAnyOrder(200, 409); // 两个状态变更只能成功一个。
+        var record = read(mvc.perform(get("/api/repairs/" + id).session(seller.session())).andExpect(status().isOk())); // 查询实际提交的状态。
+        assertThat(record.get("status").asText()).isIn("CANCELLED", "PROCESSING"); // 失败事务不能覆盖赢家结果。
+        if (record.get("status").asText().equals("PROCESSING")) {
+            submit(post("/api/admin/repairs/" + id + "/status"), admin, repairStatus("CANCELLED", "无法安排送修"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.resultNote").value("无法安排送修")); // 工作人员可为处理中的工单登记取消原因。
+        }
+    }
+
+    private com.fasterxml.jackson.databind.node.ObjectNode repair(String stage, long vehicleId, Long orderId) {
+        var input = json.createObjectNode().put("stage", stage).put("vehicleId", vehicleId)
+                .put("visitAt", LocalDateTime.now(ZoneId.of("Asia/Shanghai")).plusDays(1).toString())
+                .put("description", "请检查底盘和轮胎"); // 构造带未来到店时刻的工单表单。
+        if (orderId != null) input.put("tradeOrderId", orderId); // 售后工单填写准确的订单号。
+        return input; // 交给调用的测试按具体场景修改。
+    }
+
+    private String repairStatus(String status, String note) {
+        return json.createObjectNode().put("status", status).put("resultNote", note).toString(); // 后台提交状态和给申请人看的处理说明。
+    }
+
+    @Test
     void concurrentRequestsProduceOnlyOneOrderAndOneLock() throws Exception {
         var admin = login("order_admin"); // 使用真实的上架流程准备同一辆车。
         var seller = user(); // 为车源提供独立卖家身份。

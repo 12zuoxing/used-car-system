@@ -8,6 +8,7 @@ import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
 import { vehicleApi } from '../../api/vehicles.js'
+import { canRequestPreSale } from '../repairs/repairLabels.js' // 根据本人车源状态显示售前整备入口。
 import { canEdit, formatPrice, saleModes, statuses, vehicleTitle } from './vehicleLabels.js'
 import { useVehiclePage } from './useVehiclePage.js'
 
@@ -74,6 +75,8 @@ onMounted(() => page.load())
           <template #body="{ data }">
             <div class="table-actions">
               <RouterLink :to="{ name: 'my-vehicle-detail', params: { id: data.id } }">详情</RouterLink>
+              <!-- 创建记录时服务端会再次验证车源归属和实时状态。 -->
+              <RouterLink v-if="canRequestPreSale(data)" :to="{ name: 'pre-sale-repair', params: { id: data.id } }">售前整备</RouterLink>
               <RouterLink v-if="canEdit(data)" :to="{ name: 'vehicle-edit', params: { id: data.id } }">修改并重提</RouterLink>
               <Button v-if="data.status === 'LISTED'" label="下架" size="small" severity="danger" variant="text" @click="askOffline(data)" />
             </div>

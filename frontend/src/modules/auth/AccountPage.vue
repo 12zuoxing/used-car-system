@@ -24,6 +24,8 @@ import { auth, roleLabels } from './session.js'
         <RouterLink :to="{ name: 'my-orders' }">我的订单</RouterLink>
         <!-- 申请人可在这里查看待补充资料或经办结果。 -->
         <RouterLink :to="{ name: 'my-loans' }">我的贷款</RouterLink>
+        <!-- 申请人在个人中心查看本人整备与送修历史。 -->
+        <RouterLink :to="{ name: 'my-repairs' }">我的工单</RouterLink>
         <RouterLink v-if="auth.isManager()" :to="{ name: 'admin' }">打开管理端</RouterLink>
       </div>
     </section>

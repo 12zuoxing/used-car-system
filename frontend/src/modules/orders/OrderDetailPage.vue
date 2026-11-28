@@ -7,6 +7,7 @@ import Dialog from 'primevue/dialog' // 执行写操作前显示确认信息。
 import Message from 'primevue/message' // 显示订单操作反馈。
 import Tag from 'primevue/tag' // 展示订单当前状态。
 import { orderApi } from '../../api/orders.js' // 使用对应个人或后台接口。
+import { canRequestAfterSale } from '../repairs/repairLabels.js' // 以已成交的买入订单作为售后依据。
 import { timeLabel } from '../bookings/bookingLabels.js' // 统一按北京时间显示交易时刻。
 import { formatPrice } from '../vehicles/vehicleLabels.js' // 显示订单的真实金额快照。
 import { orderSaleMode, orderSides, orderStatuses } from './orderLabels.js' // 使用后台和个人页一致的状态文案。
@@ -132,6 +133,8 @@ watch(() => [route.params.id, props.managed], load, { immediate: true }) // 路�
         <Button v-if="managed && order.status === 'PAID'" label="确认过户" @click="prepare('complete')" />
         <!-- 只给订单买家显示登记或查看既有贷款资料的入口。 -->
         <RouterLink v-if="!managed && order.side === 'BUY'" :to="{ name: 'loan-application', params: { id: order.id } }">贷款登记</RouterLink>
+        <!-- 售后入口只给已成交订单的买方，服务端再核对真实车辆和订单关系。 -->
+        <RouterLink v-if="!managed && canRequestAfterSale(order)" :to="{ name: 'after-sale-repair', params: { id: order.id } }">售后送修</RouterLink>
       </div>
     </section>
     <!-- 对话框将模拟支付、取消和过户确认都变成明确的用户操作。 -->

@@ -29,6 +29,11 @@ export const router = createRouter({
     // 买家可从订单打开其贷款登记，个人中心提供申请列表。
     { path: '/account/orders/:id(\\d+)/loan', name: 'loan-application', component: () => import('../modules/loans/LoanApplicationPage.vue'), meta: { requiresAuth: true } },
     { path: '/account/loans', name: 'my-loans', component: () => import('../modules/loans/MyLoansPage.vue'), meta: { requiresAuth: true } },
+    // 订单与车源分别确定表单上下文，工单详情统一按工单编号读取。
+    { path: '/account/vehicles/:id(\\d+)/repair', name: 'pre-sale-repair', component: () => import('../modules/repairs/RepairForm.vue'), meta: { requiresAuth: true } },
+    { path: '/account/orders/:id(\\d+)/repair', name: 'after-sale-repair', component: () => import('../modules/repairs/RepairForm.vue'), props: { afterSale: true }, meta: { requiresAuth: true } },
+    { path: '/account/repairs', name: 'my-repairs', component: () => import('../modules/repairs/MyRepairsPage.vue'), meta: { requiresAuth: true } },
+    { path: '/account/repairs/:id(\\d+)', name: 'my-repair-detail', component: () => import('../modules/repairs/RepairDetailPage.vue'), meta: { requiresAuth: true } },
     {
       path: '/admin',
       component: () => import('../modules/admin/AdminLayout.vue'),
@@ -47,6 +52,9 @@ export const router = createRouter({
         // 贷款经办列表和详情继承管理端的工作人员角色规则。
         { path: 'loans', name: 'loan-queue', component: () => import('../modules/loans/LoanQueuePage.vue') },
         { path: 'loans/:id(\\d+)', name: 'admin-loan-detail', component: () => import('../modules/loans/LoanReviewPage.vue') },
+        // 后台路由继承 STAFF、ADMIN 角色，并使用工作人员工单接口。
+        { path: 'repairs', name: 'repair-queue', component: () => import('../modules/repairs/RepairQueuePage.vue') },
+        { path: 'repairs/:id(\\d+)', name: 'admin-repair-detail', component: () => import('../modules/repairs/RepairDetailPage.vue'), props: { managed: true } },
         { path: 'dictionaries', name: 'admin-dictionaries', component: () => import('../modules/admin/DictionaryPage.vue'), meta: { administrator: true } },
       ],
     },
