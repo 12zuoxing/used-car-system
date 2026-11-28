@@ -1,0 +1,36 @@
+{
+  "tables": 16,
+  "rowCounts": {
+    "app_role": 3,
+    "app_user": 24,
+    "appointment": 1,
+    "attachment": 8,
+    "audit_log": 58,
+    "brand": 5,
+    "city": 5,
+    "consignment": 3,
+    "loan_application": 1,
+    "notification": 33,
+    "repair_order": 2,
+    "trade_order": 4,
+    "user_role": 24,
+    "vehicle": 10007,
+    "vehicle_lock": 1,
+    "vehicle_report": 4
+  },
+  "matchingChecksums": 16,
+  "relations": {
+    "vehicleLocks": 1,
+    "consignmentOrders": 2,
+    "loanOrders": 1,
+    "afterSaleOrders": 1,
+    "reportFiles": 4
+  },
+  "attachmentHashesVerified": 8,
+  "dumpBytes": 1946962,
+  "applicationRead": {
+    "vehicleId": 1,
+    "coverPhotoId": 1,
+    "photoBytes": 316934
+  }
+}

@@ -387,6 +387,80 @@ abstract class TradeOrderWorkflowTests {
     }
 
     @Test
+    void staffCancellationOfPaidOrderPreservesPaymentAndReleasesOnlyItsLock() throws Exception {
+        var admin = login("order_admin"); // 管理员负责授权和审核车源。
+        var staff = user(); // 用真实的工作人员身份验证后台取消。
+        submit(put("/api/admin/users/" + staff.id() + "/roles"), admin, "{\"roles\":[\"STAFF\"]}").andExpect(status().isOk()); // 授予工作人员角色。
+        var seller = user(); // 卖家接收交易取消通知。
+        var buyer = user(); // 买家保留模拟支付记录及取消原因。
+        var car = listed(admin, seller, "DIRECT"); // 准备符合重新上架条件的直销车。
+        long id = id(postOrder(buyer, car.id(), token()).andExpect(status().isCreated())); // 下单后还未支付。
+        String path = "/api/admin/orders/" + id + "/cancel"; // 后台取消已支付订单的入口。
+        String reason = "{\"note\":\" 双方确认无法办理过户 \"}"; // 用带空格的输入验证实际保存的说明。
+        submit(post(path), staff.session(), reason).andExpect(status().isConflict()); // 未支付时使用原有买卖双方取消流程。
+        long loan = id(submit(post("/api/orders/" + id + "/loan"), buyer.session(), "{\"amount\":20000,\"months\":12}")
+                .andExpect(status().isCreated())); // 创建待办理贷款用于核对订单取消联动。
+        var payment = read(submit(post("/api/orders/" + id + "/pay"), buyer.session(), null).andExpect(status().isOk())); // 记录实际模拟支付时间。
+        submit(post(path), buyer.session(), reason).andExpect(status().isForbidden()); // 买家不能代替后台处理已支付订单。
+        submit(post(path), seller.session(), reason).andExpect(status().isForbidden()); // 卖家不能绕过后台权限。
+        submit(post(path), staff.session(), "{\"note\":\" \"}").andExpect(status().isBadRequest()); // 必须填写取消原因。
+        submit(post(path), staff.session(), reason).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.paidAt").value(payment.get("paidAt").asText()))
+                .andExpect(jsonPath("$.completedAt").doesNotExist())
+                .andExpect(jsonPath("$.handlingNote").value("双方确认无法办理过户")); // 保留原支付时间、取消原因和未过户事实。
+        mvc.perform(get("/api/orders/" + id).session(buyer.session()))
+                .andExpect(jsonPath("$.handlingNote").value("双方确认无法办理过户")); // 买方可查后台填写的原因。
+        mvc.perform(get("/api/orders/" + id).session(seller.session()))
+                .andExpect(jsonPath("$.status").value("CANCELLED")); // 卖方可以查看终态。
+        mvc.perform(get("/api/loans/" + loan).session(buyer.session()))
+                .andExpect(jsonPath("$.status").value("CANCELLED")); // 未办结贷款同步关闭。
+        assertThat(vehicleState(car.id())).isEqualTo("LISTED"); // 符合条件的车源恢复在售。
+        assertThat(lockCount(car.id())).isZero(); // 取消事务释放原交易锁。
+        long next = id(postOrder(buyer, car.id(), token()).andExpect(status().isCreated())); // 买家可再次下单获取新的锁。
+        submit(post(path), staff.session(), reason).andExpect(status().isConflict()); // 终态的旧订单无法再次处理。
+        assertThat(jdbc.queryForObject("SELECT order_id FROM vehicle_lock WHERE vehicle_id = ?", Long.class, car.id())).isEqualTo(next); // 核对新锁关系仍然存在。
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification WHERE event_key = ? AND receiver_id IN (?, ?)",
+                Long.class, "order:" + id + ":cancelled", buyer.id(), seller.id())).isEqualTo(2L); // 各方收到一条取消通知。
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_log WHERE subject_type = 'ORDER' AND subject_id = ? AND action = 'CANCEL_PAID_ORDER' AND actor_id = ?",
+                Long.class, id, staff.id())).isOne(); // 只保存一次后台取消审计。
+    }
+
+    @Test
+    void staffCancellationOfPaidConsignmentOrderKeepsExpiredVehicleOffline() throws Exception {
+        var admin = login("order_admin"); // 准备代销审核与过户人员。
+        var seller = user(); // 发布待出售的代销车源。
+        var buyer = user(); // 在委托有效期间下单。
+        var car = listed(admin, seller, "CONSIGN"); // 建立真实可售代销车及委托。
+        long id = id(postOrder(buyer, car.id(), token()).andExpect(status().isCreated())); // 下单锁定尚在有效期的车辆。
+        submit(post("/api/orders/" + id + "/pay"), buyer.session(), null).andExpect(status().isOk()); // 订单进入待过户。
+        expire(car); // 将临时测试委托调整为已过期。
+        submit(post("/api/admin/orders/" + id + "/cancel"), admin, "{\"note\":\"过户取消\"}")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED")); // 后台可关闭已支付旧订单。
+        assertThat(vehicleState(car.id())).isEqualTo("OFFLINE"); // 已到期代销车源转为已下架。
+        assertThat(lockCount(car.id())).isZero(); // 同时释放车辆占用。
+    }
+
+    @Test
+    void paidOrderCancellationAndCompletionHaveOneWinner() throws Exception {
+        var admin = login("order_admin"); // 一份独立会话用于后台取消。
+        var closer = login("order_admin"); // 另一份独立会话用于同时确认成交。
+        var seller = user(); // 使用正常的卖家身份发布。
+        var buyer = user(); // 完成实际下单和模拟支付。
+        var car = listed(admin, seller, "DIRECT"); // 为竞争场景提供独立车源。
+        long id = id(postOrder(buyer, car.id(), token()).andExpect(status().isCreated())); // 创建待支付订单。
+        submit(post("/api/orders/" + id + "/pay"), buyer.session(), null).andExpect(status().isOk()); // 两个后台动作都从已支付开始。
+        String path = "/api/admin/orders/" + id; // 准备两种处理请求。
+        var result = race(List.of(withCsrf(post(path + "/cancel"), admin, "{\"note\":\"双方取消过户\"}"),
+                withCsrf(post(path + "/complete"), closer, "{\"note\":\"已完成过户\"}"))); // 同时尝试取消与成交。
+        assertThat(result.stream().map(item -> item.getResponse().getStatus())).containsExactlyInAnyOrder(200, 409); // 只允许一个操作成功。
+        String state = read(mvc.perform(get("/api/orders/" + id).session(buyer.session())).andExpect(status().isOk())).get("status").asText(); // 读取赢家写入的终态。
+        assertThat(state).isIn("CANCELLED", "COMPLETED"); // 保留其中一个合法状态。
+        assertThat(vehicleState(car.id())).isEqualTo(state.equals("COMPLETED") ? "SOLD" : "LISTED"); // 车辆状态与赢家一致。
+        assertThat(lockCount(car.id())).isZero(); // 两个终态都释放同一把车锁。
+    }
+
+    @Test
     void concurrentRequestsProduceOnlyOneOrderAndOneLock() throws Exception {
         var admin = login("order_admin"); // 使用真实的上架流程准备同一辆车。
         var seller = user(); // 为车源提供独立卖家身份。

@@ -136,6 +136,30 @@ public class TradeOrderService {
         var order = required(id); // 在车辆锁内获得当前的订单。
         requireParticipant(order, actorId); // 只有交易双方可以取消未支付订单。
         if (order.getStatus() != TradeOrderStatus.LOCKED) throw stateConflict("仅待支付订单可以取消。"); // 旧单与已付款订单不可触碰车辆锁。
+        finishCancellation(vehicle, order, actorId); // 在事务中释放车辆并更新订单和关联贷款。
+        audit.record(actorId, "CANCEL_ORDER", "ORDER", id, "买卖双方在支付前取消订单"); // 区分负责取消的人和系统状态。
+        long other = order.getBuyerId() == actorId ? order.getSellerId() : order.getBuyerId(); // 找到取消动作的另一位交易参与人。
+        notify(other, order, "cancelled", "本笔待支付订单已取消。"); // 向另一方登记取消消息。
+        return view(order, actorId); // 给操作人返回最新订单状态。
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED) // 后台取消和确认过户通过同一车辆锁串行。
+    public View cancelPaid(long id, long staffId, String note) {
+        String reason = BookingSupport.note(note); // 去除原因两端的空白后再保存。
+        if (reason == null) throw BookingSupport.invalid("请填写取消原因。"); // 业务入口也要求填写原因。
+        var vehicle = lockVehicleForOrder(id); // 先锁定车源，使取消和成交互斥。
+        var order = required(id); // 等待车辆锁后读取订单的最新状态。
+        if (order.getStatus() != TradeOrderStatus.PAID) throw stateConflict("仅已支付且待过户的订单可由工作人员取消。");
+        order.setHandlingNote(reason); // 保存双方可在详情页看到的原因，同时保留模拟支付时间。
+        finishCancellation(vehicle, order, staffId); // 释放本订单持有的车源并关闭未完成的贷款。
+        audit.record(staffId, "CANCEL_PAID_ORDER", "ORDER", id, "工作人员取消已模拟支付订单"); // 记录操作人和变更类型。
+        String message = "工作人员已取消本笔订单，请在订单详情查看原因。"; // 双方收到相同提示，取消原因由有权访问详情的人员查看。
+        notify(order.getBuyerId(), order, "cancelled", message); // 向买家登记取消通知。
+        notify(order.getSellerId(), order, "cancelled", message); // 向卖家登记取消通知。
+        return view(order, null); // 返回后台可见的订单处理结果。
+    }
+
+    private void finishCancellation(VehicleEntity vehicle, TradeOrderEntity order, long actorId) {
         requireCurrentLock(vehicle, order); // 检验指定订单仍持有这辆车。
         boolean relist = vehicle.getListedAt() != null && vehicle.getReviewedAt() != null && vehicle.getReviewerId() != null
                 && consignments.isEligible(vehicle, BusinessTime.now()); // 只有仍符合审核与代销条件的车辆才能恢复在售。
@@ -145,10 +169,6 @@ public class TradeOrderService {
         order.setStatus(TradeOrderStatus.CANCELLED); // 保留已取消的订单历史。
         orders.updateById(order); // 持久化订单状态。
         loans.closeForCancelledOrder(order, actorId); // 复用车源写锁和取消事务关闭未完成贷款。
-        audit.record(actorId, "CANCEL_ORDER", "ORDER", id, "买卖双方在支付前取消订单"); // 区分负责取消的人和系统状态。
-        long other = order.getBuyerId() == actorId ? order.getSellerId() : order.getBuyerId(); // 找到取消动作的另一位交易参与人。
-        notify(other, order, "cancelled", "本笔待支付订单已取消。"); // 向另一方登记取消消息。
-        return view(order, actorId); // 给操作人返回最新订单状态。
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED) // 付款与取消通过同一车辆锁串行。
@@ -302,7 +322,7 @@ public class TradeOrderService {
             BigDecimal amount, // 下单时保存的成交金额。
             TradeOrderStatus status, // 当前的交易状态。
             OrderSide side, // 当前访问者作为买家还是卖家。
-            String handlingNote, // 工作人员填写的过户说明。
+            String handlingNote, // 工作人员填写的过户说明或取消原因。
             LocalDateTime createdAt, // 订单提交时间。
             LocalDateTime paidAt, // 模拟支付成功时间。
             LocalDateTime completedAt // 工作人员确认成交时间。

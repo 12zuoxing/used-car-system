@@ -22,14 +22,17 @@ const action = ref('') // 记录本次要执行的交易动作。
 const dialog = ref(false) // 控制确认对话框是否展示。
 const actionError = ref('') // 在弹窗内显示可重试的处理错误。
 const saving = ref(false) // 防止快速点击重复提交。
-const note = ref('') // 保存工作人员填写的可选过户说明。
+const note = ref('') // 保存工作人员填写的过户说明或取消原因。
 let requestVersion = 0 // 阻止旧订单请求覆盖新路由页面。
 
 const pending = computed(() => order.value?.status === 'LOCKED') // 待支付订单可以执行取消或买家支付。
+const needsReason = computed(() => action.value === 'cancelPaid') // 取消已支付订单必须填写原因。
+const showsNote = computed(() => needsReason.value || action.value === 'complete') // 两种后台操作共用说明输入框。
 const summary = computed(() => ({
   pay: { title: '模拟支付', text: '确认后，订单将进入待过户确认。此操作用于演示，不会扣款。', success: '模拟支付成功，等待工作人员确认过户。' },
   cancel: { title: '取消订单', text: '订单取消后将释放这笔订单对车辆的占用。', success: '订单已取消。' },
   complete: { title: '确认过户', text: '请确认过户手续已完成。提交后，车辆将标记为已售。', success: '过户已确认，订单已成交。' },
+  cancelPaid: { title: '取消已支付订单', text: '提交后将释放车辆占用。系统保留模拟支付记录，买卖双方可在订单详情查看原因。', success: '已取消订单并通知买卖双方。' },
 })[action.value]) // 根据当前动作选择正确的确认信息。
 
 async function load() {
@@ -64,11 +67,16 @@ async function submit() {
   const id = order.value.id // 保存要变更的真实订单编号。
   const kind = action.value // 保存用户已确认选择的动作。
   const success = summary.value.success // 在响应后展示对应成功文案。
+  const noteToSubmit = note.value.trim() // 提交前去除说明两端的空白。
+  if (needsReason.value && !noteToSubmit) {
+    actionError.value = '请填写取消原因。' // 保持对话框打开，让操作者补充原因。
+    return
+  }
   saving.value = true // 在操作提交时禁止关闭或重试。
   actionError.value = '' // 清除前一次操作错误。
   try {
-    const result = kind === 'complete'
-      ? await orderApi.complete(id, note.value.trim()) // 传入后台过户说明。
+    const result = showsNote.value
+      ? await orderApi[kind](id, noteToSubmit) // 后台动作提交过户说明或取消原因。
       : await orderApi[kind](id) // 个人动作只需指定订单编号。
     if (current !== requestVersion) return // 切换订单后忽略旧操作响应。
     order.value = result // 更新支付、取消或成交后的正式状态。
@@ -125,12 +133,14 @@ watch(() => [route.params.id, props.managed], load, { immediate: true }) // 路�
         <div v-if="order.completedAt"><dt>成交时间</dt><dd>{{ timeLabel(order.completedAt) }}</dd></div>
         <div v-if="order.consignmentId"><dt>代销委托</dt><dd>#{{ order.consignmentId }}</dd></div>
       </dl>
-      <p v-if="order.handlingNote" class="vehicle-description">过户说明 {{ order.handlingNote }}</p>
+      <!-- 个人和后台详情均按订单终态显示工作人员留下的内容。 -->
+      <p v-if="order.handlingNote" class="vehicle-description">{{ order.status === 'CANCELLED' ? '取消原因' : '过户说明' }} {{ order.handlingNote }}</p>
       <!-- 操作按钮随视角和状态变化，最终由服务端执行业务条件校验。 -->
       <div v-if="(!managed && (pending || order.side === 'BUY')) || (managed && order.status === 'PAID')" class="vehicle-actions">
         <Button v-if="!managed && pending && order.side === 'BUY'" label="模拟支付" @click="prepare('pay')" />
         <Button v-if="!managed && pending" label="取消订单" severity="danger" variant="outlined" @click="prepare('cancel')" />
         <Button v-if="managed && order.status === 'PAID'" label="确认过户" @click="prepare('complete')" />
+        <Button v-if="managed && order.status === 'PAID'" label="取消已支付订单" severity="danger" variant="outlined" @click="prepare('cancelPaid')" />
         <!-- 只给订单买家显示登记或查看既有贷款资料的入口。 -->
         <RouterLink v-if="!managed && order.side === 'BUY'" :to="{ name: 'loan-application', params: { id: order.id } }">贷款登记</RouterLink>
         <!-- 售后入口只给已成交订单的买方，服务端再核对真实车辆和订单关系。 -->
@@ -142,14 +152,15 @@ watch(() => [route.params.id, props.managed], load, { immediate: true }) // 路�
       <div class="booking-section">
         <p class="vehicle-description">{{ summary?.text }}</p>
         <p v-if="action === 'pay'" class="vehicle-description">本次模拟支付金额 {{ formatPrice(order?.amount) }}</p>
-        <label v-if="action === 'complete'" class="vehicle-dialog-label">过户说明
-          <textarea v-model="note" maxlength="500" rows="3" :disabled="saving" />
+        <!-- 取消必须填写原因，过户说明可以省略。 -->
+        <label v-if="showsNote" class="vehicle-dialog-label">{{ needsReason ? '取消原因' : '过户说明' }}
+          <textarea v-model="note" maxlength="500" rows="3" :required="needsReason" :disabled="saving" />
         </label>
         <Message v-if="actionError" severity="error" :closable="false">{{ actionError }}</Message>
       </div>
       <template #footer>
         <Button label="返回" severity="secondary" variant="outlined" :disabled="saving" @click="dialog = false" />
-        <Button :label="summary?.title" :severity="action === 'cancel' ? 'danger' : undefined" :loading="saving" @click="submit" />
+        <Button :label="summary?.title" :severity="['cancel', 'cancelPaid'].includes(action) ? 'danger' : undefined" :loading="saving" @click="submit" />
       </template>
     </Dialog>
   </section>

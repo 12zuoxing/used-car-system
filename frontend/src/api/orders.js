@@ -21,4 +21,5 @@ export const orderApi = {
   queue: (query) => http.request(withQuery('/admin/orders', query)), // 工作人员查询不同状态的订单。
   staffDetail: (id) => http.request('/admin' + path(id)), // 读取后台可见的订单详情。
   complete: (id, note) => post('/admin' + path(id) + '/complete', { note }), // 附上过户说明并登记完成。
+  cancelPaid: (id, note) => post('/admin' + path(id) + '/cancel', { note }), // 由工作人员提交取消原因并释放车源。
 }

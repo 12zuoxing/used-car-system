@@ -1,0 +1,33 @@
+{
+  "passed": [
+    "车源发布、照片及报告审核",
+    "看车预约和售前整备",
+    "贷款退回、补充、重提与办结",
+    "直销模拟支付、过户、售后和通知",
+    "代销委托生效与到期下架",
+    "代销支付与成交",
+    "真实 MySQL 20 个买家抢同一辆车"
+  ],
+  "screenshots": {
+    "completedOrder": 1
+  },
+  "records": {
+    "directVehicle": 4,
+    "directOrder": 1,
+    "agentOrder": 3,
+    "appointment": 1,
+    "loan": 1,
+    "preRepair": 1,
+    "afterRepair": 2,
+    "coverPhotoId": 7
+  },
+  "dashboard": {
+    "pendingVehicles": 1,
+    "lockedOrders": 1,
+    "paidOrders": 0,
+    "pendingLoans": 0,
+    "processingLoans": 0,
+    "pendingRepairs": 0,
+    "processingRepairs": 0
+  }
+}

@@ -2,6 +2,7 @@ package cn.edu.usedcar.controller; // 定义交易审核人员的接口。
 
 import cn.edu.usedcar.common.PageResult; // 使用现有分页响应。
 import cn.edu.usedcar.config.OpenApiConfig; // 复用 Swagger 会话认证名称。
+import cn.edu.usedcar.dto.OrderCancellationRequest; // 接收工作人员填写的取消原因。
 import cn.edu.usedcar.dto.OrderCompletionRequest; // 接收可选的过户说明。
 import cn.edu.usedcar.model.SessionAccount; // 提取执行过户确认的人员。
 import cn.edu.usedcar.model.TradeOrderStatus; // 用订单状态筛选后台队列。
@@ -20,7 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping; // 统一后台�
 import org.springframework.web.bind.annotation.RequestParam; // 读取可选筛选和分页字段。
 import org.springframework.web.bind.annotation.RestController; // 返回 JSON 业务数据。
 
-/** 工作人员查看订单并登记已支付订单的过户结果。
+/** 工作人员查看订单并处理已支付订单的过户或取消。
  * @author pangzhihao
  */
 @RestController // 由 Spring MVC 执行业务入口。
@@ -53,5 +54,13 @@ public class AdminTradeOrderController {
             @Valid @RequestBody(required = false) OrderCompletionRequest request, // 过户说明可省略，再由服务整理后保存。
             @AuthenticationPrincipal @Parameter(hidden = true) SessionAccount actor) { // 从会话记录负责确认的人。
         return orders.complete(id, actor.profile().id(), request == null ? null : request.note()); // 原子保存成交、车辆和委托状态。
+    }
+
+    @PostMapping("/{id}/cancel") // 后台只处理已模拟支付且尚未过户的订单。
+    @Operation(summary = "取消已模拟支付且待过户订单")
+    TradeOrderService.View cancelPaid(@PathVariable long id,
+            @Valid @RequestBody OrderCancellationRequest request, // 拒绝缺失、空白或过长的取消原因。
+            @AuthenticationPrincipal @Parameter(hidden = true) SessionAccount actor) { // 取出实际操作的工作人员。
+        return orders.cancelPaid(id, actor.profile().id(), request.note()); // 交由服务在同一事务内更新订单、车源和相关记录。
     }
 }

@@ -1,0 +1,110 @@
+{
+  "requests": 20,
+  "created": 1,
+  "conflict": 19,
+  "orders": 1,
+  "locks": 1,
+  "linkedLocks": 1,
+  "attempts": [
+    {
+      "status": 201,
+      "orderId": 4,
+      "ms": 40
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 38
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 41
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 43
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 44
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 46
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 51
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 50
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 52
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 47
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 49
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 48
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 55
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 58
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 61
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 53
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 56
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 60
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 65
+    },
+    {
+      "status": 409,
+      "code": "VEHICLE_STATE_CONFLICT",
+      "ms": 63
+    }
+  ]
+}

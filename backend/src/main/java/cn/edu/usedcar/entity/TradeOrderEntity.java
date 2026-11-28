@@ -21,7 +21,7 @@ public class TradeOrderEntity {
     private String requestKey; // 保存该买家的幂等请求标识。
     private BigDecimal amount; // 保存下单时保存的人民币成交价格。
     private TradeOrderStatus status; // 保存当前订单状态。
-    private String handlingNote; // 保存工作人员登记的过户说明。
+    private String handlingNote; // 保存工作人员登记的过户说明或取消原因。
     private LocalDateTime createdAt; // 保存订单创建时间。
     private LocalDateTime paidAt; // 保存模拟支付时间。
     private LocalDateTime completedAt; // 保存过户确认时间。
@@ -91,11 +91,11 @@ public class TradeOrderEntity {
     }
 
     public String getHandlingNote() {
-        return handlingNote; // 返回工作人员登记的过户说明。
+        return handlingNote; // 返回工作人员登记的过户说明或取消原因。
     }
 
     public void setHandlingNote(String handlingNote) {
-        this.handlingNote = handlingNote; // 写入工作人员登记的过户说明。
+        this.handlingNote = handlingNote; // 写入工作人员登记的过户说明或取消原因。
     }
 
     public LocalDateTime getCreatedAt() {
